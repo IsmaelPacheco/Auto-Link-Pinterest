@@ -1,0 +1,17 @@
+{
+    "shopee_app_id": "",
+    "shopee_secret": "",
+    "shopee_country": "BR",
+    "pinterest_access_token": "",
+    "pinterest_board_id": "",
+    "pinterest_board_name": "",
+    "gemini_api_key": "",
+    "use_gemini": true,
+    "auto_interval_minutes": 45,
+    "auto_jitter_minutes": 15,
+    "max_pins_per_day": 12,
+    "search_keywords": "utilidades domesticas, organizador, achadinhos, cozinha, decoracao",
+    "image_template": "classic_deal",
+    "board_mode": "rotate",
+    "dark_mode": true
+}

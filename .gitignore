@@ -1,0 +1,38 @@
+# Ambientes Virtuais e Dependências
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Arquivos de Configuração e Chaves Secretas (NÃO COMPARTILHAR)
+config.json
+.env
+*.key
+token.json
+client_secrets.json
+
+# Banco de Dados Local
+*.db
+*.sqlite
+*.sqlite3
+autolink.db
+
+# Diretório de Trabalho, Imagens Geradas e Logs
+workspace/
+*.log
+test_*.jpg
+test_*.png
+exchange_token.py
+test_gemini_copy.py
+test_gemini_models.py
+test_new_pin_token.py
+
+# Sistema e IDEs
+.vscode/
+.idea/
+*.suo
+*.user
+Thumbs.db

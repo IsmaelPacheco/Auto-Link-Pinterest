@@ -1,0 +1,146 @@
+"""
+worker_manual.py
+Workers assíncronos para a aba Manual / Dashboard:
+- WorkerSearchProduct: Busca ofertas na Shopee ou extrai produto via link.
+- WorkerPublishPin: Cria imagem, copy e publica o Pin no Pinterest.
+"""
+from typing import Dict, Any, Optional
+from PySide6.QtCore import QThread, Signal
+from PIL import Image
+
+from src.models.config_manager import ConfigManager
+from src.models.database import Database
+from src.engines.shopee_engine import ShopeeEngine
+from src.engines.pinterest_engine import PinterestEngine
+from src.engines.pin_image_engine import PinImageEngine
+from src.engines.copy_engine import CopyEngine
+
+
+class WorkerSearchProduct(QThread):
+    """Worker para buscar produtos ou carregar via link."""
+    sig_success = Signal(list)
+    sig_error = Signal(str)
+
+    def __init__(self, query_or_url: str, config: ConfigManager, sort_type: int = 2, min_sales: int = 0):
+        super().__init__()
+        self.query_or_url = query_or_url.strip()
+        self.cfg = config
+        self.sort_type = sort_type
+        self.min_sales = min_sales
+
+    def run(self):
+        try:
+            shopee = ShopeeEngine(
+                app_id=self.cfg.get("shopee_app_id", ""),
+                secret=self.cfg.get("shopee_secret", ""),
+                country=self.cfg.get("shopee_country", "BR")
+            )
+
+            # Se for uma URL (começa com http)
+            if self.query_or_url.startswith("http://") or self.query_or_url.startswith("https://"):
+                prod = shopee.fetch_product_from_url(self.query_or_url)
+                self.sig_success.emit([prod])
+            else:
+                # Busca por keyword
+                if not shopee.is_configured():
+                    self.sig_error.emit("Configure seu App ID e Secret da Shopee nas Configurações para buscar por palavras-chave.")
+                    return
+                prods = shopee.search_promotions(
+                    keyword=self.query_or_url,
+                    limit=25,
+                    sort_type=self.sort_type,
+                    min_sales=self.min_sales
+                )
+                self.sig_success.emit(prods)
+        except Exception as e:
+            self.sig_error.emit(str(e))
+
+
+class WorkerPublishPin(QThread):
+    """Worker para montar a arte e publicar um Pin individual."""
+    sig_log = Signal(str, str)
+    sig_success = Signal(dict)
+    sig_error = Signal(str)
+
+    def __init__(
+        self,
+        product: Dict[str, Any],
+        title: str,
+        description: str,
+        board_id: str,
+        template: str,
+        config: ConfigManager,
+        database: Database
+    ):
+        super().__init__()
+        self.product = product
+        self.title = title
+        self.description = description
+        self.board_id = board_id
+        self.template = template
+        self.cfg = config
+        self.db = database
+
+    def run(self):
+        try:
+            self.sig_log.emit("Iniciando publicação do Pin...", "info")
+
+            shopee = ShopeeEngine(
+                app_id=self.cfg.get("shopee_app_id", ""),
+                secret=self.cfg.get("shopee_secret", "")
+            )
+            pinterest = PinterestEngine(
+                access_token=self.cfg.get("pinterest_access_token", "")
+            )
+            img_engine = PinImageEngine()
+
+            # 1. Gera link de afiliado oficial encurtado se ainda não tiver
+            orig_link = self.product.get("product_link") or self.product.get("affiliate_link", "")
+            affiliate_link = self.product.get("affiliate_link")
+            if not affiliate_link or affiliate_link == orig_link:
+                affiliate_link = shopee.generate_affiliate_link(orig_link)
+                self.product["affiliate_link"] = affiliate_link
+
+            # 2. Renderiza a imagem 1000x1500
+            self.sig_log.emit("Renderizando montagem vertical 1000x1500...", "info")
+            image = img_engine.create_pin_image(self.product, template=self.template)
+            img_path = img_engine.save_pin_image(image, f"manual_{self.product.get('item_id', 'pin')}")
+
+            # 3. Publica no Pinterest
+            self.sig_log.emit("Enviando Pin para o Pinterest...", "info")
+            result = pinterest.create_pin(
+                board_id=self.board_id,
+                title=self.title,
+                description=self.description,
+                link=affiliate_link,
+                image_input=image
+            )
+
+            pin_id = result.get("pin_id", "")
+            pin_url = result.get("pin_url", "")
+
+            # 4. Salva no banco SQLite local
+            self.db.add_pin(
+                shopee_item_id=str(self.product.get("item_id", "")),
+                title=self.title,
+                affiliate_link=affiliate_link,
+                original_price=self.product.get("original_price"),
+                discount_price=self.product.get("discount_price"),
+                image_path=str(img_path),
+                pinterest_pin_id=pin_id,
+                pinterest_board_id=self.board_id,
+                pinterest_url=pin_url,
+                status="SUCCESS"
+            )
+
+            self.sig_log.emit(f"Pin publicado com sucesso! {pin_url}", "success")
+            self.sig_success.emit({
+                "pin_id": pin_id,
+                "pin_url": pin_url,
+                "image_path": str(img_path)
+            })
+
+        except Exception as e:
+            self.sig_log.emit(f"Erro ao publicar: {e}", "error")
+            self.sig_error.emit(str(e))
+

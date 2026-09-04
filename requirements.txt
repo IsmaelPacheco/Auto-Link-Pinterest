@@ -1,0 +1,12 @@
+# === INTERFACE VISUAL ===
+PySide6
+
+# === MOTORES DE IMAGEM E PROCESSAMENTO LOCAL ===
+Pillow
+
+# === REQUISIÇÕES E APIS OFICIAIS ===
+requests
+beautifulsoup4
+
+# === INTELIGÊNCIA ARTIFICIAL (OPCIONAL - GEMINI) ===
+google-genai
