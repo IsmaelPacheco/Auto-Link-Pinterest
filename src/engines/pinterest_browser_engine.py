@@ -4,29 +4,130 @@ Motor de automação de publicação no Pinterest via navegador (Playwright).
 Permite publicar Pins com foto 1000x1500, título, descrição persuasiva,
 link de afiliado da Shopee e seleção de pasta de forma autônoma,
 sem depender de aprovação da API do Pinterest!
+Suporta importação direta de cookies (Cookie-Editor) para não exigir 2FA nem login manual.
 """
+import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("AutoLink.PinterestBrowser")
 
 DEFAULT_PROFILE_DIR = Path("workspace") / "browser_profile"
+DEFAULT_COOKIES_FILE = Path("workspace") / "cookies.json"
+
+
+def clean_cookies_for_playwright(raw_cookies: list) -> List[Dict[str, Any]]:
+    """Limpa e formata os cookies exportados de extensões (como Cookie-Editor) para o Playwright."""
+    cleaned = []
+    for c in raw_cookies:
+        if not isinstance(c, dict):
+            continue
+        name = c.get("name")
+        value = c.get("value")
+        if not name or value is None:
+            continue
+
+        cookie_item: Dict[str, Any] = {
+            "name": str(name),
+            "value": str(value)
+        }
+
+        domain = c.get("domain", "")
+        if domain:
+            cookie_item["domain"] = domain
+
+        path = c.get("path", "/")
+        cookie_item["path"] = path
+
+        if not domain and "url" not in c:
+            cookie_item["url"] = "https://www.pinterest.com"
+
+        if "httpOnly" in c:
+            cookie_item["httpOnly"] = bool(c["httpOnly"])
+        if "secure" in c:
+            cookie_item["secure"] = bool(c["secure"])
+
+        s_site = str(c.get("sameSite", "")).lower()
+        if s_site in ("strict", "lax"):
+            cookie_item["sameSite"] = s_site.capitalize()
+        elif s_site in ("none", "no_restriction"):
+            cookie_item["sameSite"] = "None"
+            cookie_item["secure"] = True
+
+        exp = c.get("expires") or c.get("expirationDate")
+        if exp and isinstance(exp, (int, float)) and exp > 0:
+            cookie_item["expires"] = float(exp)
+
+        cleaned.append(cookie_item)
+    return cleaned
 
 
 class PinterestBrowserEngine:
     """Gerencia a sessão e publicação de Pins via navegador automatizado."""
 
-    def __init__(self, profile_dir: Optional[Path] = None):
+    def __init__(self, profile_dir: Optional[Path] = None, cookies_file: Optional[Path] = None):
         self.profile_dir = profile_dir or DEFAULT_PROFILE_DIR
         self.profile_dir.mkdir(parents=True, exist_ok=True)
+        self.cookies_file = cookies_file or DEFAULT_COOKIES_FILE
+
+    def import_cookies(self, raw_json_text: str) -> Dict[str, Any]:
+        """
+        Recebe o texto JSON copiado do Cookie-Editor, valida, salva e testa a sessão.
+        """
+        try:
+            parsed = json.loads(raw_json_text)
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            if not isinstance(parsed, list):
+                return {"success": False, "message": "O conteúdo não é uma lista de cookies válida."}
+
+            cleaned = clean_cookies_for_playwright(parsed)
+            if not cleaned:
+                return {"success": False, "message": "Nenhum cookie válido encontrado no JSON colado."}
+
+            # Salva no arquivo local
+            self.cookies_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.cookies_file, "w", encoding="utf-8") as f:
+                json.dump(cleaned, f, indent=2)
+
+            logger.info(f"{len(cleaned)} cookies salvos com sucesso em {self.cookies_file}")
+
+            # Testa se a sessão ficou ativa no Playwright
+            logged = self.is_logged_in()
+            if logged:
+                return {
+                    "success": True,
+                    "message": f"🎉 Sucesso! {len(cleaned)} cookies importados e sessão do Pinterest confirmada como ATIVA!"
+                }
+            else:
+                return {
+                    "success": True,
+                    "message": f"{len(cleaned)} cookies salvos com sucesso! Eles serão aplicados nas postagens."
+                }
+
+        except json.JSONDecodeError as e:
+            return {"success": False, "message": f"Erro de formatação JSON: {e}"}
+        except Exception as e:
+            return {"success": False, "message": f"Falha ao importar cookies: {e}"}
+
+    def _inject_saved_cookies(self, context) -> bool:
+        """Injeta os cookies salvos no contexto do navegador."""
+        if self.cookies_file.exists():
+            try:
+                with open(self.cookies_file, "r", encoding="utf-8") as f:
+                    cookies = json.load(f)
+                if cookies and isinstance(cookies, list):
+                    context.add_cookies(cookies)
+                    logger.info(f"{len(cookies)} cookies injetados no navegador com sucesso.")
+                    return True
+            except Exception as e:
+                logger.warning(f"Erro ao injetar cookies salvos: {e}")
+        return False
 
     def open_login_window(self) -> Dict[str, Any]:
-        """
-        Abre o navegador visível para o usuário fazer login no Pinterest.
-        A sessão fica salva permanentemente no diretório de perfil.
-        """
+        """Abre o navegador visível para o usuário fazer login no Pinterest."""
         from playwright.sync_api import sync_playwright
 
         logger.info("Abrindo navegador para login no Pinterest...")
@@ -37,22 +138,31 @@ class PinterestBrowserEngine:
                 args=["--start-maximized", "--disable-blink-features=AutomationControlled"],
                 no_viewport=True
             )
+            self._inject_saved_cookies(context)
             page = context.new_page()
-            page.goto("https://www.pinterest.com/login/")
+            page.goto("https://www.pinterest.com/")
 
             logger.info("Aguardando o usuário concluir o login...")
-            # Aguarda até que o usuário esteja logado (não esteja mais na página de login)
-            max_wait = 180  # 3 minutos
+            max_wait = 180
             start_time = time.time()
             logged = False
 
             while time.time() - start_time < max_wait:
                 time.sleep(2)
                 cur_url = page.url.lower()
-                # Se não estiver em login ou signup e tiver cookie ou avatar
                 if "login" not in cur_url and "signup" not in cur_url and "pinterest.com" in cur_url:
-                    logged = True
-                    break
+                    # Verifica se tem avatar de usuário
+                    if page.query_selector('[data-test-id="header-profile"]') or page.query_selector('a[href*="/"] img'):
+                        logged = True
+                        break
+
+            # Salva cookies atualizados da sessão
+            try:
+                current_cookies = context.cookies()
+                with open(self.cookies_file, "w", encoding="utf-8") as f:
+                    json.dump(current_cookies, f, indent=2)
+            except Exception:
+                pass
 
             context.close()
 
@@ -62,7 +172,7 @@ class PinterestBrowserEngine:
                 return {"success": False, "message": "Tempo limite para login esgotado."}
 
     def is_logged_in(self) -> bool:
-        """Verifica se há uma sessão ativa válida no perfil salvo."""
+        """Verifica se há uma sessão ativa válida."""
         from playwright.sync_api import sync_playwright
 
         try:
@@ -72,12 +182,14 @@ class PinterestBrowserEngine:
                     headless=True,
                     args=["--disable-blink-features=AutomationControlled"]
                 )
+                self._inject_saved_cookies(context)
                 page = context.new_page()
-                page.goto("https://www.pinterest.com/today/", timeout=15000)
-                time.sleep(2)
+                page.goto("https://www.pinterest.com/", timeout=15000)
+                time.sleep(3)
                 cur_url = page.url.lower()
+                is_logged = "login" not in cur_url and "signup" not in cur_url
                 context.close()
-                return "login" not in cur_url and "signup" not in cur_url
+                return is_logged
         except Exception as e:
             logger.warning(f"Erro ao verificar sessão do Pinterest: {e}")
             return False
@@ -113,6 +225,7 @@ class PinterestBrowserEngine:
                     ],
                     no_viewport=True if not headless else False
                 )
+                self._inject_saved_cookies(context)
                 page = context.new_page()
 
                 # Acessa o Criador de Pins oficial
@@ -120,11 +233,11 @@ class PinterestBrowserEngine:
                 time.sleep(4)
 
                 # Verifica se caiu na tela de login
-                if "login" in page.url.lower():
+                if "login" in page.url.lower() or "signup" in page.url.lower():
                     context.close()
                     return {
                         "success": False,
-                        "message": "Sessão expirada ou não logada. Abra as Configurações e faça login no Pinterest primeiro."
+                        "message": "Sessão expirada ou não conectada. Use o botão '🔑 Colar Cookies do Pinterest' nas Configurações para conectar sua conta."
                     }
 
                 # 1. UPLOAD DA IMAGEM
@@ -139,7 +252,6 @@ class PinterestBrowserEngine:
 
                 # 2. PREENCHIMENTO DO TÍTULO
                 logger.info("Preenchendo título do Pin...")
-                # Tenta múltiplos seletores comuns do Pinterest
                 title_selectors = [
                     'input[placeholder*="título" i]',
                     'textarea[placeholder*="título" i]',
@@ -170,7 +282,6 @@ class PinterestBrowserEngine:
                     elem = page.query_selector(sel)
                     if elem:
                         elem.click()
-                        # Se for contenteditable, usa fill ou type
                         try:
                             elem.fill(description)
                         except Exception:
@@ -198,7 +309,6 @@ class PinterestBrowserEngine:
                 # 5. SELEÇÃO DA PASTA (BOARD)
                 if board_name:
                     logger.info(f"Selecionando pasta: {board_name}")
-                    # Tenta abrir o dropdown de pastas
                     board_btn_selectors = [
                         '[data-test-id="board-dropdown-select-button"]',
                         'button[aria-label*="pasta" i]',
@@ -210,12 +320,10 @@ class PinterestBrowserEngine:
                         if btn:
                             btn.click()
                             time.sleep(2)
-                            # Digita o nome da pasta no campo de busca se houver
                             search_board_input = page.query_selector('input[placeholder*="Pesquisar" i], input[placeholder*="Search" i]')
                             if search_board_input:
                                 search_board_input.fill(board_name)
                                 time.sleep(1)
-                            # Clica no item com o nome da pasta
                             board_item = page.query_selector(f'text="{board_name}"') or page.query_selector(f'[title*="{board_name}" i]')
                             if board_item:
                                 board_item.click()

@@ -14,6 +14,7 @@ from src.models.config_manager import ConfigManager
 from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
 from src.workers.worker_manual import WorkerBrowserLogin
+from src.views.cookie_dialog import CookieImportDialog
 
 
 class SettingsPage(QWidget):
@@ -82,11 +83,36 @@ class SettingsPage(QWidget):
         self.combo_post_method.setStyleSheet("background-color: #1F2937; color: white; padding: 6px; border-radius: 4px;")
         grid_pin.addWidget(self.combo_post_method, 0, 1)
 
-        self.btn_browser_login = QPushButton("🔑 Conectar Conta / Fazer Login no Pinterest (Abrir Navegador)")
+        # Opções de Conexão de Sessão do Navegador
+        box_login_opts = QHBoxLayout()
+        box_login_opts.setSpacing(10)
+
+        self.btn_import_cookies = QPushButton("📋 Conectar Sessão (Colar Cookies do Pinterest - Zero 2FA)")
+        self.btn_import_cookies.setCursor(Qt.PointingHandCursor)
+        self.btn_import_cookies.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                font-weight: bold;
+                padding: 10px 18px;
+                border-radius: 6px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+        """)
+        self.btn_import_cookies.clicked.connect(self._abrir_import_cookies)
+        box_login_opts.addWidget(self.btn_import_cookies)
+
+        self.btn_browser_login = QPushButton("🌐 Ou Abrir Navegador para Login")
         self.btn_browser_login.setCursor(Qt.PointingHandCursor)
-        self.btn_browser_login.setStyleSheet("background-color: #E60023; color: white; font-weight: bold; padding: 10px 18px; border-radius: 6px;")
+        self.btn_browser_login.setStyleSheet("background-color: #374151; color: #D1D5DB; font-weight: 500; padding: 10px 14px; border-radius: 6px;")
         self.btn_browser_login.clicked.connect(self._abrir_login_navegador)
-        grid_pin.addWidget(self.btn_browser_login, 1, 1, alignment=Qt.AlignLeft)
+        box_login_opts.addWidget(self.btn_browser_login)
+        box_login_opts.addStretch()
+
+        grid_pin.addLayout(box_login_opts, 1, 1)
 
         self.check_headless = QCheckBox("Executar navegador em segundo plano sem janela visível (Headless)")
         grid_pin.addWidget(self.check_headless, 2, 1)
@@ -217,6 +243,11 @@ class SettingsPage(QWidget):
         self.spin_jitter.setValue(int(self.cfg.get("auto_jitter_minutes", 15)))
         self.spin_max_daily.setValue(int(self.cfg.get("max_pins_per_day", 12)))
         self.input_keywords.setText(str(self.cfg.get("search_keywords", "achadinhos, organizador, cozinha, decoracao")))
+
+    def _abrir_import_cookies(self):
+        dlg = CookieImportDialog(self)
+        if dlg.exec():
+            self.sig_log.emit("Sessão do Pinterest via cookies conectada com sucesso!", "success")
 
     def _abrir_login_navegador(self):
         self.btn_browser_login.setEnabled(False)
