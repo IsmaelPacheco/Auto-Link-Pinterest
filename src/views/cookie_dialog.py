@@ -116,3 +116,4 @@ class CookieImportDialog(QDialog):
         finally:
             self.btn_save.setEnabled(True)
             self.btn_save.setText("💾 Salvar e Validar Sessão")
+

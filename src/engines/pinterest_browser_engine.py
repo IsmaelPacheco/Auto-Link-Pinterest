@@ -1,9 +1,7 @@
 """
 pinterest_browser_engine.py
 Motor de automação de publicação no Pinterest via navegador (Playwright).
-Permite publicar Pins com foto 1000x1500, título, descrição persuasiva,
-link de afiliado da Shopee e seleção de pasta de forma autônoma,
-sem depender de aprovação da API do Pinterest!
+Blindado com safe_click (force=True e JS evaluation) para eliminar timeouts de pointer events.
 Suporta importação direta de cookies (Cookie-Editor) para não exigir 2FA nem login manual.
 """
 import json
@@ -64,6 +62,39 @@ def clean_cookies_for_playwright(raw_cookies: list) -> List[Dict[str, Any]]:
     return cleaned
 
 
+def safe_click(page, elem, timeout: int = 3000):
+    """Clica no elemento ignorando interceptações de ponteiro usando force=True ou JS dispatch."""
+    try:
+        elem.click(timeout=timeout, force=True)
+    except Exception:
+        try:
+            page.evaluate("(el) => el.click()", elem)
+        except Exception as e:
+            logger.debug(f"Falha em safe_click: {e}")
+
+
+def safe_fill(page, elem, text: str):
+    """Preenche o elemento de forma segura contra interceptações de DOM."""
+    try:
+        elem.click(timeout=2000, force=True)
+        elem.fill(text, timeout=3000)
+    except Exception:
+        try:
+            page.evaluate("""(el, val) => {
+                el.focus();
+                if ('value' in el) {
+                    el.value = val;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    el.innerText = val;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }""", elem, text)
+        except Exception as e:
+            logger.debug(f"Falha em safe_fill: {e}")
+
+
 class PinterestBrowserEngine:
     """Gerencia a sessão e publicação de Pins via navegador automatizado."""
 
@@ -87,14 +118,12 @@ class PinterestBrowserEngine:
             if not cleaned:
                 return {"success": False, "message": "Nenhum cookie válido encontrado no JSON colado."}
 
-            # Salva no arquivo local
             self.cookies_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.cookies_file, "w", encoding="utf-8") as f:
                 json.dump(cleaned, f, indent=2)
 
             logger.info(f"{len(cleaned)} cookies salvos com sucesso em {self.cookies_file}")
 
-            # Testa se a sessão ficou ativa no Playwright
             logged = self.is_logged_in()
             if logged:
                 return {
@@ -151,12 +180,10 @@ class PinterestBrowserEngine:
                 time.sleep(2)
                 cur_url = page.url.lower()
                 if "login" not in cur_url and "signup" not in cur_url and "pinterest.com" in cur_url:
-                    # Verifica se tem avatar de usuário
                     if page.query_selector('[data-test-id="header-profile"]') or page.query_selector('a[href*="/"] img'):
                         logged = True
                         break
 
-            # Salva cookies atualizados da sessão
             try:
                 current_cookies = context.cookies()
                 with open(self.cookies_file, "w", encoding="utf-8") as f:
@@ -232,12 +259,30 @@ class PinterestBrowserEngine:
                 page.goto("https://www.pinterest.com/pin-creation-tool/", timeout=45000)
                 time.sleep(4)
 
+                # Fecha eventuais modais introdutórios do Pinterest
+                intro_selectors = [
+                    'button[aria-label="Fechar"]',
+                    'button[aria-label="Close"]',
+                    'button:has-text("Entendi")',
+                    'button:has-text("Got it")',
+                    'button:has-text("Aceitar todos")',
+                    'button:has-text("Accept all")'
+                ]
+                for intro in intro_selectors:
+                    try:
+                        modal_btn = page.query_selector(intro)
+                        if modal_btn:
+                            safe_click(page, modal_btn, timeout=1000)
+                            time.sleep(1)
+                    except Exception:
+                        pass
+
                 # Verifica se caiu na tela de login
                 if "login" in page.url.lower() or "signup" in page.url.lower():
                     context.close()
                     return {
                         "success": False,
-                        "message": "Sessão expirada ou não conectada. Use o botão '🔑 Colar Cookies do Pinterest' nas Configurações para conectar sua conta."
+                        "message": "Sessão expirada ou não conectada. Use o botão '📋 Conectar Sessão' nas Configurações para colar seus cookies."
                     }
 
                 # 1. UPLOAD DA IMAGEM
@@ -264,8 +309,7 @@ class PinterestBrowserEngine:
                 for sel in title_selectors:
                     elem = page.query_selector(sel)
                     if elem:
-                        elem.click()
-                        elem.fill(title)
+                        safe_fill(page, elem, title)
                         break
 
                 # 3. PREENCHIMENTO DA DESCRIÇÃO
@@ -281,11 +325,7 @@ class PinterestBrowserEngine:
                 for sel in desc_selectors:
                     elem = page.query_selector(sel)
                     if elem:
-                        elem.click()
-                        try:
-                            elem.fill(description)
-                        except Exception:
-                            page.keyboard.type(description, delay=10)
+                        safe_fill(page, elem, description)
                         break
 
                 # 4. PREENCHIMENTO DO LINK DE AFILIADO
@@ -300,8 +340,7 @@ class PinterestBrowserEngine:
                 for sel in link_selectors:
                     elem = page.query_selector(sel)
                     if elem:
-                        elem.click()
-                        elem.fill(link)
+                        safe_fill(page, elem, link)
                         break
 
                 time.sleep(2)
@@ -318,15 +357,15 @@ class PinterestBrowserEngine:
                     for sel in board_btn_selectors:
                         btn = page.query_selector(sel)
                         if btn:
-                            btn.click()
+                            safe_click(page, btn)
                             time.sleep(2)
                             search_board_input = page.query_selector('input[placeholder*="Pesquisar" i], input[placeholder*="Search" i]')
                             if search_board_input:
-                                search_board_input.fill(board_name)
+                                safe_fill(page, search_board_input, board_name)
                                 time.sleep(1)
                             board_item = page.query_selector(f'text="{board_name}"') or page.query_selector(f'[title*="{board_name}" i]')
                             if board_item:
-                                board_item.click()
+                                safe_click(page, board_item)
                                 time.sleep(1)
                             break
 
@@ -343,10 +382,18 @@ class PinterestBrowserEngine:
                 for sel in publish_btn_selectors:
                     btn = page.query_selector(sel)
                     if btn and btn.is_enabled():
-                        btn.click()
+                        safe_click(page, btn)
                         published = True
                         time.sleep(6)
                         break
+
+                # Salva cookies atualizados para manter a sessão sempre viva
+                try:
+                    current_cookies = context.cookies()
+                    with open(self.cookies_file, "w", encoding="utf-8") as f:
+                        json.dump(current_cookies, f, indent=2)
+                except Exception:
+                    pass
 
                 context.close()
 
@@ -360,7 +407,7 @@ class PinterestBrowserEngine:
                 else:
                     return {
                         "success": False,
-                        "message": "Não foi possível localizar o botão de publicar ativo."
+                        "message": "Não foi possível localizar o botão de publicar ativo na página."
                     }
 
         except Exception as e:
