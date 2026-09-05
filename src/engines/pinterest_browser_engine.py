@@ -282,7 +282,7 @@ class PinterestBrowserEngine:
                     context.close()
                     return {
                         "success": False,
-                        "message": "Sessão expirada ou não conectada. Use o botão '📋 Conectar Sessão' nas Configurações para colar seus cookies."
+                        "message": "Sessão expirada ou não conectada. Use o botão ' Conectar Sessão' nas Configurações para colar seus cookies."
                     }
 
                 # 1. UPLOAD DA IMAGEM
@@ -306,27 +306,64 @@ class PinterestBrowserEngine:
                     '[data-test-id="pin-draft-title"] textarea',
                     '#storyboard-selector-title'
                 ]
+                title_elem = None
                 for sel in title_selectors:
                     elem = page.query_selector(sel)
                     if elem:
+                        title_elem = elem
                         safe_fill(page, elem, title)
                         break
 
-                # 3. PREENCHIMENTO DA DESCRIÇÃO
+                # 3. PREENCHIMENTO DA DESCRIÇÃO (REACT / DRAFT.JS RICH TEXT)
                 logger.info("Preenchendo descrição e hashtags...")
                 desc_selectors = [
                     '[data-test-id="editor-description"] div[contenteditable="true"]',
-                    'div[role="textbox"]',
-                    'textarea[placeholder*="descrição" i]',
-                    'textarea[placeholder*="description" i]',
+                    '[data-test-id="pin-draft-description"] div[contenteditable="true"]',
                     '[data-test-id="pin-draft-description"] textarea',
-                    'div[contenteditable="true"]'
+                    '[data-test-id="pin-draft-description"] [role="textbox"]',
+                    'div[contenteditable="true"][aria-label*="descri" i]',
+                    'div[contenteditable="true"][placeholder*="descri" i]',
+                    'div[contenteditable="true"][data-placeholder*="descri" i]',
+                    'div[role="textbox"][aria-label*="descri" i]',
+                    'textarea[placeholder*="descri" i]',
+                    'textarea[placeholder*="description" i]',
+                    'textarea[placeholder*="conte" i]',
+                    'textarea[placeholder*="tell" i]',
+                    '[data-test-id="editor-description"]',
+                    '[data-test-id="pin-draft-description"]'
                 ]
+                desc_filled = False
                 for sel in desc_selectors:
                     elem = page.query_selector(sel)
                     if elem:
-                        safe_fill(page, elem, description)
-                        break
+                        try:
+                            safe_click(page, elem)
+                            time.sleep(0.3)
+                            elem.focus()
+                            time.sleep(0.3)
+                            page.keyboard.press("Control+A")
+                            page.keyboard.press("Backspace")
+                            time.sleep(0.2)
+                            page.keyboard.insert_text(description)
+                            time.sleep(0.5)
+                            desc_filled = True
+                            logger.info(f"Descrição preenchida com sucesso via seletor: {sel}")
+                            break
+                        except Exception as e:
+                            logger.debug(f"Falha ao preencher descrição com {sel}: {e}")
+
+                # Fallback: se os seletores não acharam o elemento, navega pelo Tab a partir do título
+                if not desc_filled and title_elem:
+                    logger.info("Navegando para campo de descrição via tecla Tab...")
+                    try:
+                        title_elem.focus()
+                        page.keyboard.press("Tab")
+                        time.sleep(0.5)
+                        page.keyboard.insert_text(description)
+                        time.sleep(0.5)
+                        logger.info("Descrição inserida via Tab com sucesso!")
+                    except Exception as e:
+                        logger.warning(f"Falha no fallback Tab da descrição: {e}")
 
                 # 4. PREENCHIMENTO DO LINK DE AFILIADO
                 logger.info(f"Preenchendo link de afiliado: {link}")
