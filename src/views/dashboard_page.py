@@ -389,7 +389,10 @@ class DashboardPage(QWidget):
             return
 
         board_id = self.combo_boards.currentData() or self.cfg.get("pinterest_board_id", "")
-        if not board_id:
+        board_name = self.combo_boards.currentText() or self.cfg.get("pinterest_board_name", "")
+        post_method = self.cfg.get("post_method", "browser")
+
+        if post_method == "api" and not board_id:
             QMessageBox.warning(self, "Atenção", "Selecione uma pasta do Pinterest nas Configurações.")
             return
 
@@ -409,7 +412,8 @@ class DashboardPage(QWidget):
             board_id=board_id,
             template="classic_deal",
             config=self.cfg,
-            database=self.db
+            database=self.db,
+            board_name=board_name
         )
         self._worker_publish.sig_log.connect(self.sig_log.emit)
         self._worker_publish.sig_success.connect(self._on_publish_success)

@@ -12,6 +12,7 @@ from src.models.config_manager import ConfigManager
 from src.models.database import Database
 from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
+from src.engines.pinterest_browser_engine import PinterestBrowserEngine
 from src.engines.pin_image_engine import PinImageEngine
 from src.engines.copy_engine import CopyEngine
 
@@ -56,6 +57,19 @@ class WorkerSearchProduct(QThread):
             self.sig_error.emit(str(e))
 
 
+class WorkerBrowserLogin(QThread):
+    """Worker para abrir o navegador de login sem travar a interface gráfica."""
+    sig_result = Signal(dict)
+
+    def run(self):
+        try:
+            engine = PinterestBrowserEngine()
+            res = engine.open_login_window()
+            self.sig_result.emit(res)
+        except Exception as e:
+            self.sig_result.emit({"success": False, "message": str(e)})
+
+
 class WorkerPublishPin(QThread):
     """Worker para montar a arte e publicar um Pin individual."""
     sig_log = Signal(str, str)
@@ -70,7 +84,8 @@ class WorkerPublishPin(QThread):
         board_id: str,
         template: str,
         config: ConfigManager,
-        database: Database
+        database: Database,
+        board_name: str = ""
     ):
         super().__init__()
         self.product = product
@@ -80,6 +95,7 @@ class WorkerPublishPin(QThread):
         self.template = template
         self.cfg = config
         self.db = database
+        self.board_name = board_name
 
     def run(self):
         try:
@@ -88,9 +104,6 @@ class WorkerPublishPin(QThread):
             shopee = ShopeeEngine(
                 app_id=self.cfg.get("shopee_app_id", ""),
                 secret=self.cfg.get("shopee_secret", "")
-            )
-            pinterest = PinterestEngine(
-                access_token=self.cfg.get("pinterest_access_token", "")
             )
             img_engine = PinImageEngine()
 
@@ -106,18 +119,46 @@ class WorkerPublishPin(QThread):
             image = img_engine.create_pin_image(self.product, template=self.template)
             img_path = img_engine.save_pin_image(image, f"manual_{self.product.get('item_id', 'pin')}")
 
-            # 3. Publica no Pinterest
-            self.sig_log.emit("Enviando Pin para o Pinterest...", "info")
-            result = pinterest.create_pin(
-                board_id=self.board_id,
-                title=self.title,
-                description=self.description,
-                link=affiliate_link,
-                image_input=image
-            )
+            post_method = self.cfg.get("post_method", "browser")
 
-            pin_id = result.get("pin_id", "")
-            pin_url = result.get("pin_url", "")
+            if post_method == "browser":
+                # 3A. Publicação via Navegador Automatizado (Playwright)
+                self.sig_log.emit("🌐 Publicando via Navegador Automatizado (Playwright)...", "info")
+                browser_engine = PinterestBrowserEngine()
+                headless = self.cfg.get("browser_headless", False)
+                
+                target_board = self.board_name or self.cfg.get("pinterest_board_name", "")
+                result = browser_engine.publish_pin(
+                    image_path=str(img_path),
+                    title=self.title,
+                    description=self.description,
+                    link=affiliate_link,
+                    board_name=target_board,
+                    headless=headless
+                )
+
+                if not result.get("success"):
+                    raise Exception(result.get("message", "Falha desconhecida no navegador."))
+
+                pin_id = "browser_pin"
+                pin_url = result.get("pin_url", "https://www.pinterest.com/")
+
+            else:
+                # 3B. Publicação via API Oficial v5
+                self.sig_log.emit("Enviando Pin para o Pinterest via API Oficial...", "info")
+                pinterest = PinterestEngine(
+                    access_token=self.cfg.get("pinterest_access_token", "")
+                )
+                result = pinterest.create_pin(
+                    board_id=self.board_id,
+                    title=self.title,
+                    description=self.description,
+                    link=affiliate_link,
+                    image_input=image
+                )
+
+                pin_id = result.get("pin_id", "")
+                pin_url = result.get("pin_url", "")
 
             # 4. Salva no banco SQLite local
             self.db.add_pin(
@@ -133,7 +174,7 @@ class WorkerPublishPin(QThread):
                 status="SUCCESS"
             )
 
-            self.sig_log.emit(f"Pin publicado com sucesso! {pin_url}", "success")
+            self.sig_log.emit(f"✅ Pin publicado com sucesso! {pin_url}", "success")
             self.sig_success.emit({
                 "pin_id": pin_id,
                 "pin_url": pin_url,

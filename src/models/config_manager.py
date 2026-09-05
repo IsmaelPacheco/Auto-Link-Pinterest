@@ -32,7 +32,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "auto_jitter_minutes": 15,
     "max_pins_per_day": 12,
     "search_keywords": "utilidades domesticas, organizador, achadinhos, cozinha, decoracao",
-    "image_template": "classic_deal",
+    # Modo de Postagem no Pinterest
+    "post_method": "browser",  # "browser" (Playwright sem aprovação) ou "api" (API v5 oficial)
+    "browser_headless": False, # Se True, roda navegador sem janela visível
     
     # Interface
     "dark_mode": True

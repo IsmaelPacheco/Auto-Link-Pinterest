@@ -17,6 +17,7 @@ from src.models.database import Database
 from src.models.trending_catalog import TRENDING_NICHES, get_combined_viral_keywords
 from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
+from src.engines.pinterest_browser_engine import PinterestBrowserEngine
 from src.engines.pin_image_engine import PinImageEngine
 from src.engines.copy_engine import CopyEngine
 
@@ -198,21 +199,38 @@ class WorkerAutopilot(QThread):
                 self.sig_status.emit("Elaborando título e descrição persuasiva...")
                 pin_title, pin_desc = copy_engine.generate_copy(selected_product)
 
-                # 8. Publica no Pinterest via API oficial v5
+                # 8. Publica no Pinterest (Navegador Playwright ou API Oficial)
+                post_method = self.cfg.get("post_method", "browser")
                 self.sig_status.emit(f"Publicando em '{board_name}'...")
-                self.sig_log.emit(f"📤 Enviando Pin para a pasta '{board_name}' no Pinterest...", "info")
 
-                pin_result = pinterest.create_pin(
-                    board_id=board_id,
-                    title=pin_title,
-                    description=pin_desc,
-                    link=affiliate_link,
-                    image_input=image,
-                    alt_text=pin_title
-                )
-
-                pin_id = pin_result.get("pin_id", "")
-                pin_url = pin_result.get("pin_url", "")
+                if post_method == "browser":
+                    self.sig_log.emit(f"🌐 Publicando via Navegador na pasta '{board_name}'...", "info")
+                    browser_engine = PinterestBrowserEngine()
+                    headless = self.cfg.get("browser_headless", False)
+                    res_pin = browser_engine.publish_pin(
+                        image_path=str(img_path),
+                        title=pin_title,
+                        description=pin_desc,
+                        link=affiliate_link,
+                        board_name=board_name,
+                        headless=headless
+                    )
+                    if not res_pin.get("success"):
+                        raise Exception(res_pin.get("message", "Falha na publicação via navegador."))
+                    pin_id = "browser_pin"
+                    pin_url = res_pin.get("pin_url", "https://www.pinterest.com/")
+                else:
+                    self.sig_log.emit(f"📤 Enviando Pin para a API oficial na pasta '{board_name}'...", "info")
+                    pin_result = pinterest.create_pin(
+                        board_id=board_id,
+                        title=pin_title,
+                        description=pin_desc,
+                        link=affiliate_link,
+                        image_input=image,
+                        alt_text=pin_title
+                    )
+                    pin_id = pin_result.get("pin_id", "")
+                    pin_url = pin_result.get("pin_url", "")
 
                 # 9. Registra no banco SQLite local
                 self.db.add_pin(

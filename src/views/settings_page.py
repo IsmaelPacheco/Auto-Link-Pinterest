@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, Signal
 from src.models.config_manager import ConfigManager
 from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
+from src.workers.worker_manual import WorkerBrowserLogin
 
 
 class SettingsPage(QWidget):
@@ -69,34 +70,51 @@ class SettingsPage(QWidget):
         card_shopee.layout().addLayout(grid_shopee)
         layout.addWidget(card_shopee)
 
-        # 2. CARD: PINTEREST API v5
-        card_pin = self._criar_card("📌 Pinterest Developer API v5 (Oficial)")
+        # 2. CARD: PINTEREST (NAVEGADOR OU API v5)
+        card_pin = self._criar_card("📌 Configurações de Postagem no Pinterest")
         grid_pin = QGridLayout()
         grid_pin.setSpacing(12)
 
-        grid_pin.addWidget(QLabel("Access Token:"), 0, 0)
+        grid_pin.addWidget(QLabel("Método de Publicação:"), 0, 0)
+        self.combo_post_method = QComboBox()
+        self.combo_post_method.addItem("🌐 Navegador Automatizado Playwright (Sem aprovação - Imediato)", "browser")
+        self.combo_post_method.addItem("⚡ API Oficial v5 (Requer Standard Access aprovado)", "api")
+        self.combo_post_method.setStyleSheet("background-color: #1F2937; color: white; padding: 6px; border-radius: 4px;")
+        grid_pin.addWidget(self.combo_post_method, 0, 1)
+
+        self.btn_browser_login = QPushButton("🔑 Conectar Conta / Fazer Login no Pinterest (Abrir Navegador)")
+        self.btn_browser_login.setCursor(Qt.PointingHandCursor)
+        self.btn_browser_login.setStyleSheet("background-color: #E60023; color: white; font-weight: bold; padding: 10px 18px; border-radius: 6px;")
+        self.btn_browser_login.clicked.connect(self._abrir_login_navegador)
+        grid_pin.addWidget(self.btn_browser_login, 1, 1, alignment=Qt.AlignLeft)
+
+        self.check_headless = QCheckBox("Executar navegador em segundo plano sem janela visível (Headless)")
+        grid_pin.addWidget(self.check_headless, 2, 1)
+
+        grid_pin.addWidget(QLabel("Access Token (API v5):"), 3, 0)
         self.input_pin_token = QLineEdit()
         self.input_pin_token.setEchoMode(QLineEdit.Password)
-        self.input_pin_token.setPlaceholderText("pina_...")
-        grid_pin.addWidget(self.input_pin_token, 0, 1)
+        self.input_pin_token.setPlaceholderText("pina_... (necessário apenas para modo API)")
+        grid_pin.addWidget(self.input_pin_token, 3, 1)
 
-        grid_pin.addWidget(QLabel("Pasta do Pinterest (Board):"), 1, 0)
+        grid_pin.addWidget(QLabel("Pasta do Pinterest (Board):"), 4, 0)
         box_board = QHBoxLayout()
         self.combo_pin_board = QComboBox()
+        self.combo_pin_board.setEditable(True)
         self.combo_pin_board.setMinimumWidth(260)
         box_board.addWidget(self.combo_pin_board)
 
-        self.btn_carregar_boards = QPushButton("🔄 Atualizar Pastas")
+        self.btn_carregar_boards = QPushButton("🔄 Atualizar Pastas (API)")
         self.btn_carregar_boards.setCursor(Qt.PointingHandCursor)
         self.btn_carregar_boards.clicked.connect(self._carregar_boards_pinterest)
         box_board.addWidget(self.btn_carregar_boards)
-        grid_pin.addLayout(box_board, 1, 1)
+        grid_pin.addLayout(box_board, 4, 1)
 
-        self.btn_test_pin = QPushButton("⚡ Testar Conexão Pinterest")
+        self.btn_test_pin = QPushButton("⚡ Testar Token da API")
         self.btn_test_pin.setCursor(Qt.PointingHandCursor)
-        self.btn_test_pin.setStyleSheet("background-color: #E60023; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px;")
+        self.btn_test_pin.setStyleSheet("background-color: #374151; color: white; font-weight: bold; padding: 8px 16px; border-radius: 6px;")
         self.btn_test_pin.clicked.connect(self._testar_pinterest)
-        grid_pin.addWidget(self.btn_test_pin, 2, 1, alignment=Qt.AlignLeft)
+        grid_pin.addWidget(self.btn_test_pin, 5, 1, alignment=Qt.AlignLeft)
 
         card_pin.layout().addLayout(grid_pin)
         layout.addWidget(card_pin)
@@ -181,11 +199,16 @@ class SettingsPage(QWidget):
         country = self.cfg.get("shopee_country", "BR")
         self.combo_shopee_country.setCurrentIndex(0 if country == "BR" else 1)
 
+        cur_post_method = self.cfg.get("post_method", "browser")
+        self.combo_post_method.setCurrentIndex(0 if cur_post_method == "browser" else 1)
+        self.check_headless.setChecked(bool(self.cfg.get("browser_headless", False)))
+
         self.input_pin_token.setText(str(self.cfg.get("pinterest_access_token", "")))
         saved_board_id = str(self.cfg.get("pinterest_board_id", ""))
         saved_board_name = str(self.cfg.get("pinterest_board_name", "Pasta Padrão"))
-        if saved_board_id:
+        if saved_board_id or saved_board_name:
             self.combo_pin_board.addItem(saved_board_name, saved_board_id)
+            self.combo_pin_board.setEditText(saved_board_name)
 
         self.check_use_gemini.setChecked(bool(self.cfg.get("use_gemini", True)))
         self.input_gemini_key.setText(str(self.cfg.get("gemini_key", "") or self.cfg.get("gemini_api_key", "")))
@@ -195,6 +218,25 @@ class SettingsPage(QWidget):
         self.spin_max_daily.setValue(int(self.cfg.get("max_pins_per_day", 12)))
         self.input_keywords.setText(str(self.cfg.get("search_keywords", "achadinhos, organizador, cozinha, decoracao")))
 
+    def _abrir_login_navegador(self):
+        self.btn_browser_login.setEnabled(False)
+        self.btn_browser_login.setText("Aguardando login no navegador aberto...")
+        self.sig_log.emit("Abrindo janela do Chromium para login no Pinterest...", "info")
+
+        self._worker_login = WorkerBrowserLogin()
+        self._worker_login.sig_result.connect(self._on_browser_login_finished)
+        self._worker_login.start()
+
+    def _on_browser_login_finished(self, res: dict):
+        self.btn_browser_login.setEnabled(True)
+        self.btn_browser_login.setText("🔑 Conectar Conta / Fazer Login no Pinterest (Abrir Navegador)")
+        if res.get("success"):
+            QMessageBox.information(self, "Login Pinterest", res.get("message"))
+            self.sig_log.emit("Sessão do Pinterest no navegador salva com sucesso!", "success")
+        else:
+            QMessageBox.warning(self, "Aviso", res.get("message", "Login não concluído."))
+            self.sig_log.emit(f"Aviso no login do navegador: {res.get('message')}", "warning")
+
     def _salvar_tudo(self):
         board_id = self.combo_pin_board.currentData() or ""
         board_name = self.combo_pin_board.currentText() or ""
@@ -203,6 +245,8 @@ class SettingsPage(QWidget):
             "shopee_app_id": self.input_shopee_app_id.text().strip(),
             "shopee_secret": self.input_shopee_secret.text().strip(),
             "shopee_country": "BR" if self.combo_shopee_country.currentIndex() == 0 else "GLOBAL",
+            "post_method": self.combo_post_method.currentData() or "browser",
+            "browser_headless": self.check_headless.isChecked(),
             "pinterest_access_token": self.input_pin_token.text().strip(),
             "pinterest_board_id": board_id,
             "pinterest_board_name": board_name,

@@ -10,3 +10,6 @@ beautifulsoup4
 
 # === INTELIGÊNCIA ARTIFICIAL (OPCIONAL - GEMINI) ===
 google-genai
+
+# === AUTOMAÇÃO DE NAVEGADOR (PINTEREST BROWSER FALLBACK) ===
+playwright
