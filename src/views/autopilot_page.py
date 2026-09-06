@@ -220,6 +220,12 @@ class AutopilotPage(QWidget):
         if lbl_tot:
             lbl_tot.setText(str(total_pins))
 
+        schedule_mode = self.cfg.get("schedule_mode", "distributed_day")
+        start_h = self.cfg.get("day_start_hour", 8)
+        end_h = self.cfg.get("day_end_hour", 22)
+        total_h = max(1, end_h - start_h)
+        avg_m = (total_h * 60) // max(1, max_daily)
+
         interval = self.cfg.get("auto_interval_minutes", 45)
         jitter = self.cfg.get("auto_jitter_minutes", 15)
         keywords = self.cfg.get("search_keywords", "geral")
@@ -233,8 +239,13 @@ class AutopilotPage(QWidget):
         }
         mode_desc = mode_labels.get(board_mode, "🔄 Rotação Automática")
 
+        if schedule_mode == "distributed_day":
+            sched_desc = f"📅 Janela Diária: <b>{start_h:02d}:00 às {end_h:02d}:00</b> ({max_daily} pins/dia • ~{avg_m} min)"
+        else:
+            sched_desc = f"⏱ Intervalo Fixo: <b>{interval} min (±{jitter} min)</b>"
+
         self.lbl_info_params.setText(
-            f"📁 Distribuição: <b>{mode_desc}</b> | ⏱ Intervalo: <b>{interval} min (±{jitter} min)</b> | 🏷 Termos: <b>{keywords}</b>"
+            f"📁 Pastas: <b>{mode_desc}</b> | {sched_desc} | 🏷 Termos: <b>{keywords}</b>"
         )
 
     def _on_board_mode_changed(self, index: int):
@@ -245,12 +256,13 @@ class AutopilotPage(QWidget):
         self.sig_log.emit(f"⚙️ Modo de distribuição de pastas atualizado para: '{new_mode}'", "info")
 
     def _iniciar_autopilot(self):
-        # Validações antes de iniciar
-        board_id = self.cfg.get("pinterest_board_id", "")
-        token = self.cfg.get("pinterest_access_token", "")
-        if not board_id or not token:
-            QMessageBox.warning(self, "Atenção", "Configure o Access Token e a Pasta do Pinterest nas Configurações antes de ligar o robô.")
-            return
+        post_method = self.cfg.get("post_method", "browser")
+        if post_method == "api":
+            board_id = self.cfg.get("pinterest_board_id", "")
+            token = self.cfg.get("pinterest_access_token", "")
+            if not board_id or not token:
+                QMessageBox.warning(self, "Atenção", "Configure o Access Token e a Pasta do Pinterest nas Configurações antes de ligar o robô no modo API.")
+                return
 
         self.btn_iniciar.setEnabled(False)
         self.btn_parar.setEnabled(True)

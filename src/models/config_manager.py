@@ -27,11 +27,16 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "gemini_api_key": "",
     "use_gemini": True,
     
-    # Automação & Anti-Spam
+    # Automação & Anti-Spam (Distribuição Inteligente ao Longo do Dia)
+    "schedule_mode": "distributed_day",  # "distributed_day" (ao longo do dia) ou "interval"
+    "day_start_hour": 8,                 # Início às 08:00
+    "day_end_hour": 22,                  # Término às 22:00
+    "max_pins_per_day": 10,              # Quantidade total de pins para espalhar no dia
     "auto_interval_minutes": 45,
     "auto_jitter_minutes": 15,
-    "max_pins_per_day": 12,
     "search_keywords": "utilidades domesticas, organizador, achadinhos, cozinha, decoracao",
+    "board_mode": "rotate",
+    
     # Modo de Postagem no Pinterest
     "post_method": "browser",  # "browser" (Playwright sem aprovação) ou "api" (API v5 oficial)
     "browser_headless": False, # Se True, roda navegador sem janela visível

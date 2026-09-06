@@ -7,12 +7,16 @@
     "pinterest_board_name": "",
     "gemini_api_key": "",
     "use_gemini": true,
+    "schedule_mode": "distributed_day",
+    "day_start_hour": 8,
+    "day_end_hour": 22,
+    "max_pins_per_day": 10,
     "auto_interval_minutes": 45,
     "auto_jitter_minutes": 15,
-    "max_pins_per_day": 12,
     "search_keywords": "utilidades domesticas, organizador, achadinhos, cozinha, decoracao",
     "image_template": "classic_deal",
     "board_mode": "rotate",
+    "post_method": "browser",
+    "browser_headless": false,
     "dark_mode": true
 }
-

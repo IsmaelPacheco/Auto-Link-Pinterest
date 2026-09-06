@@ -162,36 +162,67 @@ class SettingsPage(QWidget):
         card_ai.layout().addLayout(grid_ai)
         layout.addWidget(card_ai)
 
-        # 4. CARD: PARÂMETROS ANTI-SPAM & PILOTO AUTOMÁTICO
-        card_anti_spam = self._criar_card("🛡️ Política Anti-Spam & Parâmetros do Autopilot")
+        # 4. CARD: PARÂMETROS DE AGENDAMENTO (DISTRIBUIÇÃO AO LONGO DO DIA)
+        card_anti_spam = self._criar_card("📅 Distribuição de Postagens & Piloto Automático")
         grid_spam = QGridLayout()
         grid_spam.setSpacing(12)
 
-        grid_spam.addWidget(QLabel("Intervalo Médio (Minutos):"), 0, 0)
+        grid_spam.addWidget(QLabel("Estratégia de Postagem:"), 0, 0)
+        self.combo_schedule_mode = QComboBox()
+        self.combo_schedule_mode.addItem("📅 Distribuir ao Longo do Dia (Sem postar de madrugada)", "distributed_day")
+        self.combo_schedule_mode.addItem("⏱️ Intervalo Rígido Fixo (A cada X minutos dia e noite)", "interval")
+        self.combo_schedule_mode.setStyleSheet("background-color: #1F2937; color: white; padding: 6px; border-radius: 4px;")
+        self.combo_schedule_mode.currentIndexChanged.connect(self._on_schedule_mode_changed)
+        grid_spam.addWidget(self.combo_schedule_mode, 0, 1)
+
+        grid_spam.addWidget(QLabel("Meta Diária (Pins por dia):"), 1, 0)
+        self.spin_max_daily = QSpinBox()
+        self.spin_max_daily.setRange(1, 50)
+        self.spin_max_daily.setValue(10)
+        self.spin_max_daily.setSuffix(" pins/dia")
+        self.spin_max_daily.valueChanged.connect(self._atualizar_resumo_distribuicao)
+        grid_spam.addWidget(self.spin_max_daily, 1, 1)
+
+        grid_spam.addWidget(QLabel("Horário de Início (Manhã):"), 2, 0)
+        self.spin_start_hour = QSpinBox()
+        self.spin_start_hour.setRange(0, 23)
+        self.spin_start_hour.setValue(8)
+        self.spin_start_hour.setSuffix(":00 h")
+        self.spin_start_hour.valueChanged.connect(self._atualizar_resumo_distribuicao)
+        grid_spam.addWidget(self.spin_start_hour, 2, 1)
+
+        grid_spam.addWidget(QLabel("Horário de Término (Noite):"), 3, 0)
+        self.spin_end_hour = QSpinBox()
+        self.spin_end_hour.setRange(1, 24)
+        self.spin_end_hour.setValue(22)
+        self.spin_end_hour.setSuffix(":00 h")
+        self.spin_end_hour.valueChanged.connect(self._atualizar_resumo_distribuicao)
+        grid_spam.addWidget(self.spin_end_hour, 3, 1)
+
+        self.lbl_dist_preview = QLabel()
+        self.lbl_dist_preview.setStyleSheet("color: #10B981; font-size: 12px; font-weight: bold; background: #064E3B; padding: 8px; border-radius: 6px;")
+        grid_spam.addWidget(self.lbl_dist_preview, 4, 1)
+
+        self.lbl_fixed_interval = QLabel("Intervalo Fixo (Minutos):")
         self.spin_interval = QSpinBox()
         self.spin_interval.setRange(10, 360)
         self.spin_interval.setValue(45)
         self.spin_interval.setSuffix(" min")
-        grid_spam.addWidget(self.spin_interval, 0, 1)
+        grid_spam.addWidget(self.lbl_fixed_interval, 5, 0)
+        grid_spam.addWidget(self.spin_interval, 5, 1)
 
-        grid_spam.addWidget(QLabel("Variação Randômica (Jitter):"), 1, 0)
+        self.lbl_fixed_jitter = QLabel("Variação (Jitter):")
         self.spin_jitter = QSpinBox()
         self.spin_jitter.setRange(0, 60)
         self.spin_jitter.setValue(15)
         self.spin_jitter.setSuffix(" min (+/-)")
-        grid_spam.addWidget(self.spin_jitter, 1, 1)
+        grid_spam.addWidget(self.lbl_fixed_jitter, 6, 0)
+        grid_spam.addWidget(self.spin_jitter, 6, 1)
 
-        grid_spam.addWidget(QLabel("Limite Máximo Diário de Pins:"), 2, 0)
-        self.spin_max_daily = QSpinBox()
-        self.spin_max_daily.setRange(1, 50)
-        self.spin_max_daily.setValue(12)
-        self.spin_max_daily.setSuffix(" pins/dia")
-        grid_spam.addWidget(self.spin_max_daily, 2, 1)
-
-        grid_spam.addWidget(QLabel("Palavras-chave de busca:"), 3, 0)
+        grid_spam.addWidget(QLabel("Palavras-chave de busca:"), 7, 0)
         self.input_keywords = QLineEdit()
         self.input_keywords.setPlaceholderText("achadinhos, organizador, cozinha, utilidades, decoracao")
-        grid_spam.addWidget(self.input_keywords, 3, 1)
+        grid_spam.addWidget(self.input_keywords, 7, 1)
 
         card_anti_spam.layout().addLayout(grid_spam)
         layout.addWidget(card_anti_spam)
@@ -239,10 +270,45 @@ class SettingsPage(QWidget):
         self.check_use_gemini.setChecked(bool(self.cfg.get("use_gemini", True)))
         self.input_gemini_key.setText(str(self.cfg.get("gemini_key", "") or self.cfg.get("gemini_api_key", "")))
 
+        cur_sched = self.cfg.get("schedule_mode", "distributed_day")
+        idx_sched = 0 if cur_sched == "distributed_day" else 1
+        self.combo_schedule_mode.setCurrentIndex(idx_sched)
+        self.spin_start_hour.setValue(int(self.cfg.get("day_start_hour", 8)))
+        self.spin_end_hour.setValue(int(self.cfg.get("day_end_hour", 22)))
+        self.spin_max_daily.setValue(int(self.cfg.get("max_pins_per_day", 10)))
         self.spin_interval.setValue(int(self.cfg.get("auto_interval_minutes", 45)))
         self.spin_jitter.setValue(int(self.cfg.get("auto_jitter_minutes", 15)))
-        self.spin_max_daily.setValue(int(self.cfg.get("max_pins_per_day", 12)))
         self.input_keywords.setText(str(self.cfg.get("search_keywords", "achadinhos, organizador, cozinha, decoracao")))
+        self._on_schedule_mode_changed()
+        self._atualizar_resumo_distribuicao()
+
+    def _on_schedule_mode_changed(self):
+        is_distributed = (self.combo_schedule_mode.currentData() == "distributed_day")
+        self.lbl_dist_preview.setVisible(is_distributed)
+        self.lbl_fixed_interval.setVisible(not is_distributed)
+        self.spin_interval.setVisible(not is_distributed)
+        self.lbl_fixed_jitter.setVisible(not is_distributed)
+        self.spin_jitter.setVisible(not is_distributed)
+
+    def _atualizar_resumo_distribuicao(self):
+        start = self.spin_start_hour.value()
+        end = self.spin_end_hour.value()
+        pins = self.spin_max_daily.value()
+
+        if end <= start:
+            self.lbl_dist_preview.setText("⚠️ O horário de término deve ser posterior ao de início.")
+            self.lbl_dist_preview.setStyleSheet("color: #F87171; background: #450A0A; padding: 8px; border-radius: 6px;")
+            return
+
+        total_hours = end - start
+        total_mins = total_hours * 60
+        avg_mins = total_mins // max(1, pins)
+
+        self.lbl_dist_preview.setText(
+            f"💡 Distribuição Ativa: {pins} pins espalhados em {total_hours} horas (das {start:02d}:00 às {end:02d}:00).\n"
+            f"Média de 1 pin a cada ~{avg_mins} minutos com intervalo humanizado orgânico."
+        )
+        self.lbl_dist_preview.setStyleSheet("color: #10B981; background: #064E3B; padding: 8px; border-radius: 6px; font-weight: bold;")
 
     def _abrir_import_cookies(self):
         dlg = CookieImportDialog(self)
@@ -284,9 +350,12 @@ class SettingsPage(QWidget):
             "use_gemini": self.check_use_gemini.isChecked(),
             "gemini_api_key": self.input_gemini_key.text().strip(),
             "gemini_key": self.input_gemini_key.text().strip(),
+            "schedule_mode": self.combo_schedule_mode.currentData() or "distributed_day",
+            "day_start_hour": self.spin_start_hour.value(),
+            "day_end_hour": self.spin_end_hour.value(),
+            "max_pins_per_day": self.spin_max_daily.value(),
             "auto_interval_minutes": self.spin_interval.value(),
             "auto_jitter_minutes": self.spin_jitter.value(),
-            "max_pins_per_day": self.spin_max_daily.value(),
             "search_keywords": self.input_keywords.text().strip()
         }
         self.cfg.update(data)
