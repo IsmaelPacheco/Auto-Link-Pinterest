@@ -246,6 +246,20 @@ class DashboardPage(QWidget):
         layout_form = QVBoxLayout(container_form)
         layout_form.setSpacing(12)
 
+        # Seletor de Formato de Mídia
+        box_format = QHBoxLayout()
+        box_format.setSpacing(8)
+        lbl_fmt = QLabel("🎬 Formato do Pin:")
+        lbl_fmt.setStyleSheet("font-weight: bold; color: #E5E7EB; font-size: 12px;")
+        box_format.addWidget(lbl_fmt)
+
+        self.combo_format = QComboBox()
+        self.combo_format.addItem("📌 Imagem Estática (1000x1500)", "image")
+        self.combo_format.addItem("🎬 Vídeo Animado (.MP4 com Zoom & Pulso)", "video")
+        self.combo_format.setStyleSheet("background: #1F2937; color: white; border-radius: 4px; padding: 6px; font-size: 12px;")
+        box_format.addWidget(self.combo_format)
+        layout_form.addLayout(box_format)
+
         layout_form.addWidget(QLabel("📌 Título do Pin (Pinterest):"))
         self.input_pin_title = QLineEdit()
         self.input_pin_title.setPlaceholderText("Título chamativo...")
@@ -439,6 +453,7 @@ class DashboardPage(QWidget):
         board_name = self.combo_boards.currentText() or self.cfg.get("pinterest_board_name", "")
         post_method = self.cfg.get("post_method", "browser")
         palette_key = self.combo_palette.currentData() or "auto"
+        post_format = self.combo_format.currentData() or "image"
 
         if post_method == "api" and not board_id:
             QMessageBox.warning(self, "Atenção", "Selecione uma pasta do Pinterest nas Configurações.")
@@ -462,7 +477,8 @@ class DashboardPage(QWidget):
             config=self.cfg,
             database=self.db,
             board_name=board_name,
-            palette_key=palette_key
+            palette_key=palette_key,
+            post_format=post_format
         )
         self._worker_publish.sig_log.connect(self.sig_log.emit)
         self._worker_publish.sig_success.connect(self._on_publish_success)

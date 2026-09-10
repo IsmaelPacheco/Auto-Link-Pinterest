@@ -14,6 +14,7 @@ from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
 from src.engines.pinterest_browser_engine import PinterestBrowserEngine
 from src.engines.pin_image_engine import PinImageEngine
+from src.engines.pin_video_engine import PinVideoEngine
 from src.engines.copy_engine import CopyEngine
 
 
@@ -86,7 +87,8 @@ class WorkerPublishPin(QThread):
         config: ConfigManager,
         database: Database,
         board_name: str = "",
-        palette_key: str = "auto"
+        palette_key: str = "auto",
+        post_format: str = "image"
     ):
         super().__init__()
         self.product = product
@@ -98,6 +100,7 @@ class WorkerPublishPin(QThread):
         self.db = database
         self.board_name = board_name
         self.palette_key = palette_key
+        self.post_format = post_format
 
     def run(self):
         try:
@@ -116,26 +119,37 @@ class WorkerPublishPin(QThread):
                 affiliate_link = shopee.generate_affiliate_link(orig_link)
                 self.product["affiliate_link"] = affiliate_link
 
-            # 2. Renderiza a imagem 1000x1500 com paleta harmônica
-            self.sig_log.emit("Renderizando montagem vertical 1000x1500...", "info")
-            image = img_engine.create_pin_image(
-                self.product,
-                template=self.template,
-                palette_key=self.palette_key
-            )
-            img_path = img_engine.save_pin_image(image, f"manual_{self.product.get('item_id', 'pin')}")
+            # 2. Renderiza a mídia (Vídeo animado .mp4 ou Imagem 1000x1500)
+            if self.post_format == "video":
+                self.sig_log.emit("🎬 Renderizando vídeo animado (.mp4) com zoom e efeitos...", "info")
+                video_engine = PinVideoEngine()
+                media_path = video_engine.create_pin_video(
+                    self.product,
+                    palette_key=self.palette_key,
+                    filename_prefix="manual"
+                )
+                image_for_api = None
+            else:
+                self.sig_log.emit("Renderizando montagem vertical 1000x1500...", "info")
+                image_for_api = img_engine.create_pin_image(
+                    self.product,
+                    template=self.template,
+                    palette_key=self.palette_key
+                )
+                media_path = img_engine.save_pin_image(image_for_api, f"manual_{self.product.get('item_id', 'pin')}")
 
             post_method = self.cfg.get("post_method", "browser")
 
             if post_method == "browser":
                 # 3A. Publicação via Navegador Automatizado (Playwright)
-                self.sig_log.emit("🌐 Publicando via Navegador Automatizado (Playwright)...", "info")
+                tipo_midia = "Vídeo Animado (.mp4)" if self.post_format == "video" else "Imagem Vertical"
+                self.sig_log.emit(f"🌐 Publicando {tipo_midia} via Navegador Automatizado...", "info")
                 browser_engine = PinterestBrowserEngine()
                 headless = self.cfg.get("browser_headless", False)
                 
                 target_board = self.board_name or self.cfg.get("pinterest_board_name", "")
                 result = browser_engine.publish_pin(
-                    image_path=str(img_path),
+                    image_path=str(media_path),
                     title=self.title,
                     description=self.description,
                     link=affiliate_link,
@@ -155,12 +169,14 @@ class WorkerPublishPin(QThread):
                 pinterest = PinterestEngine(
                     access_token=self.cfg.get("pinterest_access_token", "")
                 )
+                if not image_for_api:
+                    image_for_api = img_engine.create_pin_image(self.product, template=self.template, palette_key=self.palette_key)
                 result = pinterest.create_pin(
                     board_id=self.board_id,
                     title=self.title,
                     description=self.description,
                     link=affiliate_link,
-                    image_input=image
+                    image_input=image_for_api
                 )
 
                 pin_id = result.get("pin_id", "")
@@ -173,7 +189,7 @@ class WorkerPublishPin(QThread):
                 affiliate_link=affiliate_link,
                 original_price=self.product.get("original_price"),
                 discount_price=self.product.get("discount_price"),
-                image_path=str(img_path),
+                image_path=str(media_path),
                 pinterest_pin_id=pin_id,
                 pinterest_board_id=self.board_id,
                 pinterest_url=pin_url,

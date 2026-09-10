@@ -37,9 +37,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "search_keywords": "utilidades domesticas, organizador, achadinhos, cozinha, decoracao",
     "board_mode": "rotate",
     
-    # Modo de Postagem no Pinterest
+    # Modo e Formato de Postagem no Pinterest
     "post_method": "browser",  # "browser" (Playwright sem aprovação) ou "api" (API v5 oficial)
     "browser_headless": False, # Se True, roda navegador sem janela visível
+    "post_format": "hybrid",   # "hybrid" (misto foto/vídeo), "image" (só foto), "video" (só vídeo)
     
     # Interface
     "dark_mode": True

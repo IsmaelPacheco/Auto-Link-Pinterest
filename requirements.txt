@@ -13,3 +13,8 @@ google-genai
 
 # === AUTOMAÇÃO DE NAVEGADOR (PINTEREST BROWSER FALLBACK) ===
 playwright
+
+# === MOTOR DE VÍDEOS ANIMADOS (.MP4 100% LOCAL) ===
+imageio
+imageio-ffmpeg
+numpy

@@ -219,10 +219,18 @@ class SettingsPage(QWidget):
         grid_spam.addWidget(self.lbl_fixed_jitter, 6, 0)
         grid_spam.addWidget(self.spin_jitter, 6, 1)
 
-        grid_spam.addWidget(QLabel("Palavras-chave de busca:"), 7, 0)
+        grid_spam.addWidget(QLabel("Formato de Mídia (Piloto Automático):"), 7, 0)
+        self.combo_post_format = QComboBox()
+        self.combo_post_format.addItem("🎲 Híbrido: 50% Vídeos Animados & 50% Imagens (Recomendado - Máximo Alcance)", "hybrid")
+        self.combo_post_format.addItem("🎬 Apenas Vídeos Animados (.MP4 em Loop com Zoom & Efeitos)", "video")
+        self.combo_post_format.addItem("📌 Apenas Imagens Estáticas (1000x1500)", "image")
+        self.combo_post_format.setStyleSheet("background-color: #1F2937; color: white; padding: 6px; border-radius: 4px;")
+        grid_spam.addWidget(self.combo_post_format, 7, 1)
+
+        grid_spam.addWidget(QLabel("Palavras-chave de busca:"), 8, 0)
         self.input_keywords = QLineEdit()
         self.input_keywords.setPlaceholderText("achadinhos, organizador, cozinha, utilidades, decoracao")
-        grid_spam.addWidget(self.input_keywords, 7, 1)
+        grid_spam.addWidget(self.input_keywords, 8, 1)
 
         card_anti_spam.layout().addLayout(grid_spam)
         layout.addWidget(card_anti_spam)
@@ -279,6 +287,15 @@ class SettingsPage(QWidget):
         self.spin_interval.setValue(int(self.cfg.get("auto_interval_minutes", 45)))
         self.spin_jitter.setValue(int(self.cfg.get("auto_jitter_minutes", 15)))
         self.input_keywords.setText(str(self.cfg.get("search_keywords", "achadinhos, organizador, cozinha, decoracao")))
+        
+        cur_fmt = self.cfg.get("post_format", "hybrid")
+        fmt_idx = 0
+        for i in range(self.combo_post_format.count()):
+            if self.combo_post_format.itemData(i) == cur_fmt:
+                fmt_idx = i
+                break
+        self.combo_post_format.setCurrentIndex(fmt_idx)
+
         self._on_schedule_mode_changed()
         self._atualizar_resumo_distribuicao()
 
@@ -356,6 +373,7 @@ class SettingsPage(QWidget):
             "max_pins_per_day": self.spin_max_daily.value(),
             "auto_interval_minutes": self.spin_interval.value(),
             "auto_jitter_minutes": self.spin_jitter.value(),
+            "post_format": self.combo_post_format.currentData() or "hybrid",
             "search_keywords": self.input_keywords.text().strip()
         }
         self.cfg.update(data)

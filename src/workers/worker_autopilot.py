@@ -21,6 +21,7 @@ from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
 from src.engines.pinterest_browser_engine import PinterestBrowserEngine
 from src.engines.pin_image_engine import PinImageEngine
+from src.engines.pin_video_engine import PinVideoEngine
 from src.engines.copy_engine import CopyEngine
 
 logger = logging.getLogger("AutoLink.WorkerAutopilot")
@@ -275,16 +276,37 @@ class WorkerAutopilot(QThread):
                 affiliate_link = shopee.generate_affiliate_link(orig_link)
                 selected_product["affiliate_link"] = affiliate_link
 
-                # 6. Monta a imagem vertical 1000x1500 com Pillow (Cores e Headlines Rotativas)
-                self.sig_status.emit("Renderizando imagem 1000x1500 com paleta dinâmica...")
-                image = img_engine.create_pin_image(
-                    selected_product,
-                    template=self.cfg.get("image_template", "classic_deal"),
-                    palette_key="auto",
-                    custom_headline="auto"
-                )
-                img_path = img_engine.save_pin_image(image, f"pin_{p_item_id}")
-                self.sig_log.emit(f"🎨 Arte vertical 1000x1500 com cores dinâmicas gerada: {img_path.name}", "info")
+                # 6. Decide o Formato de Mídia (Vídeo Animado .mp4 ou Imagem Estática)
+                post_format = self.cfg.get("post_format", "hybrid")
+                if post_format == "hybrid":
+                    # 50% chance de vídeo animado / 50% imagem estática (Equilíbrio de Ouro)
+                    make_video = (random.random() < 0.5)
+                elif post_format == "video":
+                    make_video = True
+                else:
+                    make_video = False
+
+                if make_video:
+                    self.sig_status.emit("Renderizando vídeo animado (.mp4) com zoom e efeitos...")
+                    video_engine = PinVideoEngine()
+                    media_path = video_engine.create_pin_video(
+                        selected_product,
+                        palette_key="auto",
+                        custom_headline="auto",
+                        filename_prefix="auto_vid"
+                    )
+                    image_for_api = None
+                    self.sig_log.emit(f"🎬 Vídeo animado (.mp4) gerado com sucesso: {media_path.name}", "info")
+                else:
+                    self.sig_status.emit("Renderizando imagem 1000x1500 com paleta dinâmica...")
+                    image_for_api = img_engine.create_pin_image(
+                        selected_product,
+                        template=self.cfg.get("image_template", "classic_deal"),
+                        palette_key="auto",
+                        custom_headline="auto"
+                    )
+                    media_path = img_engine.save_pin_image(image_for_api, f"pin_{p_item_id}")
+                    self.sig_log.emit(f"🎨 Arte vertical 1000x1500 com cores dinâmicas gerada: {media_path.name}", "info")
 
                 # 7. Gera Título e Descrição Otimizados
                 self.sig_status.emit("Elaborando título e descrição persuasiva...")
@@ -295,11 +317,12 @@ class WorkerAutopilot(QThread):
                 self.sig_status.emit(f"Publicando em '{board_name}'...")
 
                 if post_method == "browser":
-                    self.sig_log.emit(f"🌐 Publicando via Navegador na pasta '{board_name}'...", "info")
+                    tipo_desc = "Vídeo Animado (.mp4)" if make_video else "Imagem Vertical"
+                    self.sig_log.emit(f"🌐 Publicando {tipo_desc} via Navegador na pasta '{board_name}'...", "info")
                     browser_engine = PinterestBrowserEngine()
                     headless = self.cfg.get("browser_headless", False)
                     res_pin = browser_engine.publish_pin(
-                        image_path=str(img_path),
+                        image_path=str(media_path),
                         title=pin_title,
                         description=pin_desc,
                         link=affiliate_link,
@@ -312,12 +335,14 @@ class WorkerAutopilot(QThread):
                     pin_url = res_pin.get("pin_url", "https://www.pinterest.com/")
                 else:
                     self.sig_log.emit(f"📤 Enviando Pin para a API oficial na pasta '{board_name}'...", "info")
+                    if not image_for_api:
+                        image_for_api = img_engine.create_pin_image(selected_product, palette_key="auto", custom_headline="auto")
                     pin_result = pinterest.create_pin(
                         board_id=board_id,
                         title=pin_title,
                         description=pin_desc,
                         link=affiliate_link,
-                        image_input=image,
+                        image_input=image_for_api,
                         alt_text=pin_title
                     )
                     pin_id = pin_result.get("pin_id", "")
@@ -330,7 +355,7 @@ class WorkerAutopilot(QThread):
                     affiliate_link=affiliate_link,
                     original_price=selected_product.get("original_price"),
                     discount_price=selected_product.get("discount_price"),
-                    image_path=str(img_path),
+                    image_path=str(media_path),
                     pinterest_pin_id=pin_id,
                     pinterest_board_id=board_id,
                     pinterest_url=pin_url,

@@ -81,7 +81,7 @@ def run_tests():
     print(f"[OK] PinImageEngine OK! Imagem gerada: {out_file.name} ({out_file.stat().st_size} bytes, 1000x1500 px)")
 
     # 5. Teste de Assinatura Shopee SHA256 Oficial e Busca
-    print("\n[5/5] Testando Assinatura SHA256, Conexao Real e Busca na Shopee...")
+    print("\n[5/6] Testando Assinatura SHA256, Conexao Real e Busca na Shopee...")
     from src.engines.shopee_engine import ShopeeEngine
     shopee = ShopeeEngine(app_id=cfg.get("shopee_app_id"), secret=cfg.get("shopee_secret"))
     res_shopee = shopee.test_connection()
@@ -96,7 +96,18 @@ def run_tests():
     assert len(produtos) > 0, "Nenhum produto retornado na busca!"
     print("[OK] Shopee API Busca e Ofertas OK!")
 
-    # 6. Teste de importação da GUI PySide6
+    # 6. Teste PinVideoEngine (MP4 1000x1500)
+    print("\n[6/6] Testando PinVideoEngine (MP4 vertical 1000x1500 animado)...")
+    from src.engines.pin_video_engine import PinVideoEngine
+    vid_engine = PinVideoEngine()
+    dummy_prod_img = Image.new("RGBA", (600, 600), (240, 100, 80, 255))
+    vid_engine.img_engine.download_image = lambda url: dummy_prod_img
+    video_path = vid_engine.create_pin_video(prod_sample, filename_prefix="test_verification")
+    assert video_path.exists(), "Arquivo de vídeo não foi criado!"
+    assert video_path.stat().st_size > 5000, "Tamanho de vídeo muito pequeno!"
+    print(f"[OK] PinVideoEngine OK! Video gerado: {video_path.name} ({video_path.stat().st_size} bytes, 1000x1500 px)")
+
+    # Bonus. Teste de importação da GUI PySide6
     print("\n[Bonus] Testando importacao de todas as paginas da interface...")
     from src.views.main_window import MainWindow
     print("[OK] Importacao PySide6 e MainWindow OK!")

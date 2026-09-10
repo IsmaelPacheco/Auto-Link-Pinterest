@@ -285,15 +285,16 @@ class PinterestBrowserEngine:
                         "message": "Sessão expirada ou não conectada. Use o botão ' Conectar Sessão' nas Configurações para colar seus cookies."
                     }
 
-                # 1. UPLOAD DA IMAGEM
-                logger.info("Enviando imagem 1000x1500...")
+                # 1. UPLOAD DA MÍDIA (IMAGEM OU VÍDEO .MP4)
+                is_video = img_file.suffix.lower() in (".mp4", ".mov", ".m4v", ".webm")
+                logger.info(f"Enviando {'vídeo animado (.mp4)' if is_video else 'imagem vertical'}...")
                 file_input = page.wait_for_selector('input[type="file"]', timeout=20000)
                 if file_input:
                     file_input.set_input_files(str(img_file.resolve()))
-                    time.sleep(3)
+                    time.sleep(6 if is_video else 3)
                 else:
                     context.close()
-                    return {"success": False, "message": "Campo de upload de imagem não encontrado na página."}
+                    return {"success": False, "message": "Campo de upload não encontrado na página."}
 
                 # 2. PREENCHIMENTO DO TÍTULO
                 logger.info("Preenchendo título do Pin...")
@@ -407,7 +408,7 @@ class PinterestBrowserEngine:
                             break
 
                 # 6. CLIQUE NO BOTÃO PUBLICAR
-                logger.info("Clicando no botão Publicar...")
+                logger.info("Aguardando liberação do botão Publicar...")
                 publish_btn_selectors = [
                     '[data-test-id="board-dropdown-save-button"]',
                     'button:has-text("Publicar")',
@@ -415,13 +416,27 @@ class PinterestBrowserEngine:
                     'button:has-text("Publish")',
                     'button:has-text("Save")'
                 ]
+
+                # Se for vídeo, aguarda o processamento do Pinterest concluir (até 25s)
+                max_video_wait = 25 if is_video else 5
+                for _ in range(max_video_wait):
+                    ready = False
+                    for sel in publish_btn_selectors:
+                        btn = page.query_selector(sel)
+                        if btn and btn.is_enabled():
+                            ready = True
+                            break
+                    if ready:
+                        break
+                    time.sleep(1)
+
                 published = False
                 for sel in publish_btn_selectors:
                     btn = page.query_selector(sel)
                     if btn and btn.is_enabled():
                         safe_click(page, btn)
                         published = True
-                        time.sleep(6)
+                        time.sleep(8 if is_video else 6)
                         break
 
                 # Salva cookies atualizados para manter a sessão sempre viva
