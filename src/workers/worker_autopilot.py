@@ -366,7 +366,7 @@ class WorkerAutopilot(QThread):
                 self.sig_pin_published.emit({
                     "title": pin_title,
                     "url": pin_url,
-                    "image_path": str(img_path),
+                    "image_path": str(media_path),
                     "affiliate_link": affiliate_link
                 })
 

@@ -200,7 +200,7 @@ class WorkerPublishPin(QThread):
             self.sig_success.emit({
                 "pin_id": pin_id,
                 "pin_url": pin_url,
-                "image_path": str(img_path)
+                "image_path": str(media_path)
             })
 
         except Exception as e:

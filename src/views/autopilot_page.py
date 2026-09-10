@@ -310,13 +310,18 @@ class AutopilotPage(QWidget):
         self._last_pin_url = url
 
         if img_path and Path(img_path).exists():
-            pix = QPixmap(img_path)
-            self.lbl_last_img.setPixmap(pix.scaled(
-                self.lbl_last_img.width(),
-                self.lbl_last_img.height(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            ))
+            if str(img_path).lower().endswith((".mp4", ".mov", ".m4v")):
+                self.lbl_last_img.setText("🎬 Vídeo Animado\n(Publicado)")
+                self.lbl_last_img.setStyleSheet("color: #10B981; font-weight: bold; font-size: 13px; text-align: center; border: 2px dashed #10B981; border-radius: 8px;")
+            else:
+                pix = QPixmap(img_path)
+                if not pix.isNull():
+                    self.lbl_last_img.setPixmap(pix.scaled(
+                        self.lbl_last_img.width(),
+                        self.lbl_last_img.height(),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation
+                    ))
 
     def _abrir_link_ultimo_pin(self, event):
         url = getattr(self, "_last_pin_url", "")
