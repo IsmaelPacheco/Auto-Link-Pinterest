@@ -275,14 +275,16 @@ class WorkerAutopilot(QThread):
                 affiliate_link = shopee.generate_affiliate_link(orig_link)
                 selected_product["affiliate_link"] = affiliate_link
 
-                # 6. Monta a imagem vertical 1000x1500 com Pillow
-                self.sig_status.emit("Renderizando imagem 1000x1500 (Pillow)...")
+                # 6. Monta a imagem vertical 1000x1500 com Pillow (Cores e Headlines Rotativas)
+                self.sig_status.emit("Renderizando imagem 1000x1500 com paleta dinâmica...")
                 image = img_engine.create_pin_image(
                     selected_product,
-                    template=self.cfg.get("image_template", "classic_deal")
+                    template=self.cfg.get("image_template", "classic_deal"),
+                    palette_key="auto",
+                    custom_headline="auto"
                 )
                 img_path = img_engine.save_pin_image(image, f"pin_{p_item_id}")
-                self.sig_log.emit(f"🎨 Arte vertical 1000x1500 gerada com sucesso: {img_path.name}", "info")
+                self.sig_log.emit(f"🎨 Arte vertical 1000x1500 com cores dinâmicas gerada: {img_path.name}", "info")
 
                 # 7. Gera Título e Descrição Otimizados
                 self.sig_status.emit("Elaborando título e descrição persuasiva...")

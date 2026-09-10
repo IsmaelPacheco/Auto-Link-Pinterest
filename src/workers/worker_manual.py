@@ -85,7 +85,8 @@ class WorkerPublishPin(QThread):
         template: str,
         config: ConfigManager,
         database: Database,
-        board_name: str = ""
+        board_name: str = "",
+        palette_key: str = "auto"
     ):
         super().__init__()
         self.product = product
@@ -96,6 +97,7 @@ class WorkerPublishPin(QThread):
         self.cfg = config
         self.db = database
         self.board_name = board_name
+        self.palette_key = palette_key
 
     def run(self):
         try:
@@ -114,9 +116,13 @@ class WorkerPublishPin(QThread):
                 affiliate_link = shopee.generate_affiliate_link(orig_link)
                 self.product["affiliate_link"] = affiliate_link
 
-            # 2. Renderiza a imagem 1000x1500
+            # 2. Renderiza a imagem 1000x1500 com paleta harmônica
             self.sig_log.emit("Renderizando montagem vertical 1000x1500...", "info")
-            image = img_engine.create_pin_image(self.product, template=self.template)
+            image = img_engine.create_pin_image(
+                self.product,
+                template=self.template,
+                palette_key=self.palette_key
+            )
             img_path = img_engine.save_pin_image(image, f"manual_{self.product.get('item_id', 'pin')}")
 
             post_method = self.cfg.get("post_method", "browser")

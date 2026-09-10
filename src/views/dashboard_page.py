@@ -207,6 +207,34 @@ class DashboardPage(QWidget):
         self.lbl_image_preview.setAlignment(Qt.AlignCenter)
         self.lbl_image_preview.setText("Nenhum produto\nselecionado")
         box_preview.addWidget(self.lbl_image_preview)
+
+        # Seletor de Paleta de Cores
+        box_palette = QHBoxLayout()
+        box_palette.setSpacing(6)
+        lbl_pal = QLabel("🎨 Paleta:")
+        lbl_pal.setStyleSheet("color: #9CA3AF; font-size: 11px; font-weight: bold;")
+        box_palette.addWidget(lbl_pal)
+
+        self.combo_palette = QComboBox()
+        self.combo_palette.addItem("🎲 Aleatório (Rotativo)", "auto")
+        self.combo_palette.addItem("🔥 Shopee Warm", "shopee_warm")
+        self.combo_palette.addItem("✨ Clean Nordic", "clean_nordic")
+        self.combo_palette.addItem("💄 Rose Gold", "rose_gold")
+        self.combo_palette.addItem("🌿 Fresh Mint", "fresh_mint")
+        self.combo_palette.addItem("💜 Lavender Dream", "lavender_modern")
+        self.combo_palette.addItem("💎 Royal Indigo", "royal_indigo")
+        self.combo_palette.addItem("🍯 Golden Honey", "golden_honey")
+        self.combo_palette.setStyleSheet("background: #1F2937; color: white; border-radius: 4px; padding: 4px; font-size: 11px;")
+        self.combo_palette.currentIndexChanged.connect(self._on_palette_changed)
+        box_palette.addWidget(self.combo_palette)
+        box_preview.addLayout(box_palette)
+
+        self.btn_new_art = QPushButton("🎲 Nova Variação Visual")
+        self.btn_new_art.setCursor(Qt.PointingHandCursor)
+        self.btn_new_art.setStyleSheet("background-color: #374151; color: #E5E7EB; padding: 6px; border-radius: 6px; font-size: 11px;")
+        self.btn_new_art.clicked.connect(self._regenerar_variacao_arte)
+        box_preview.addWidget(self.btn_new_art)
+
         layout_right.addLayout(box_preview)
 
         # FORMULÁRIO DE PUBLICAÇÃO
@@ -360,9 +388,28 @@ class DashboardPage(QWidget):
         self.input_pin_link.setText(product.get("affiliate_link") or product.get("product_link", ""))
 
         # 2. Gera Imagem 1000x1500
+        self._renderizar_preview_imagem()
+
+    def _on_palette_changed(self, index: int):
+        if self.current_product:
+            self._renderizar_preview_imagem()
+
+    def _regenerar_variacao_arte(self):
+        if self.current_product:
+            self.sig_log.emit("🎨 Gerando nova variação de cores e layout...", "info")
+            self._renderizar_preview_imagem()
+
+    def _renderizar_preview_imagem(self):
+        if not self.current_product:
+            return
         try:
-            self.sig_log.emit("Gerando preview da montagem 1000x1500...", "info")
-            pil_img = self.img_engine.create_pin_image(product)
+            palette_key = self.combo_palette.currentData() or "auto"
+            self.sig_log.emit(f"Gerando preview da montagem 1000x1500 (Paleta: {palette_key})...", "info")
+            pil_img = self.img_engine.create_pin_image(
+                self.current_product,
+                palette_key=palette_key,
+                custom_headline="auto"
+            )
             self.current_pil_image = pil_img
 
             # Converte PIL para QPixmap escalonado
@@ -391,6 +438,7 @@ class DashboardPage(QWidget):
         board_id = self.combo_boards.currentData() or self.cfg.get("pinterest_board_id", "")
         board_name = self.combo_boards.currentText() or self.cfg.get("pinterest_board_name", "")
         post_method = self.cfg.get("post_method", "browser")
+        palette_key = self.combo_palette.currentData() or "auto"
 
         if post_method == "api" and not board_id:
             QMessageBox.warning(self, "Atenção", "Selecione uma pasta do Pinterest nas Configurações.")
@@ -413,7 +461,8 @@ class DashboardPage(QWidget):
             template="classic_deal",
             config=self.cfg,
             database=self.db,
-            board_name=board_name
+            board_name=board_name,
+            palette_key=palette_key
         )
         self._worker_publish.sig_log.connect(self.sig_log.emit)
         self._worker_publish.sig_success.connect(self._on_publish_success)

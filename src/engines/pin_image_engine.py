@@ -2,23 +2,112 @@
 pin_image_engine.py
 Motor de composição visual 100% nativo com Pillow (PIL).
 Gera artes verticais em alta definição (1000x1500 pixels - proporção 2:3)
-otimizadas para máxima taxa de cliques (CTR) no Pinterest.
+com biblioteca de 7 paletas harmônicas, headlines variadas e múltiplos templates.
+Garante diversidade visual total para evitar penalização de spam no algoritmo do Pinterest!
 """
 import io
 import logging
+import random
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 import requests
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 logger = logging.getLogger("AutoLink.ImageEngine")
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "workspace" / "pins"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# 🎨 7 Paletas Harmônicas de Alta Conversão no Pinterest
+COLOR_PALETTES: Dict[str, Dict[str, Any]] = {
+    "shopee_warm": {
+        "name": "Shopee Warm (Laranja & Sunset)",
+        "bg_top": (255, 248, 244),
+        "bg_bottom": (255, 237, 230),
+        "highlight": (238, 77, 45),     # Laranja Shopee
+        "badge": (230, 0, 35),          # Vermelho
+        "cta": (238, 77, 45),
+        "text_main": (34, 34, 34),
+        "text_muted": (120, 120, 120),
+    },
+    "clean_nordic": {
+        "name": "Clean Nordic (Bege & Minimalista)",
+        "bg_top": (250, 248, 245),
+        "bg_bottom": (242, 238, 233),
+        "highlight": (180, 83, 9),      # Âmbar sofisticado
+        "badge": (220, 38, 38),         # Vermelho tomate
+        "cta": (28, 25, 23),            # Preto sofisticado
+        "text_main": (28, 25, 23),
+        "text_muted": (115, 115, 115),
+    },
+    "rose_gold": {
+        "name": "Rose Gold & Blush (Beleza / Decoração / Estilo)",
+        "bg_top": (255, 241, 242),
+        "bg_bottom": (254, 226, 226),
+        "highlight": (225, 29, 72),     # Framboesa vibrante
+        "badge": (225, 29, 72),
+        "cta": (190, 18, 60),
+        "text_main": (30, 27, 75),
+        "text_muted": (140, 100, 110),
+    },
+    "fresh_mint": {
+        "name": "Fresh Mint (Organização / Cozinha / Limpeza)",
+        "bg_top": (240, 253, 244),
+        "bg_bottom": (220, 252, 231),
+        "highlight": (16, 185, 129),    # Verde Esmeralda
+        "badge": (239, 68, 68),
+        "cta": (5, 150, 105),
+        "text_main": (6, 78, 59),
+        "text_muted": (80, 120, 100),
+    },
+    "lavender_modern": {
+        "name": "Lavender Dream (Gadgets & Achadinhos TikTok)",
+        "bg_top": (245, 243, 255),
+        "bg_bottom": (237, 233, 254),
+        "highlight": (124, 58, 237),    # Púrpura Vibrante
+        "badge": (236, 72, 153),
+        "cta": (109, 40, 217),
+        "text_main": (46, 16, 101),
+        "text_muted": (120, 100, 140),
+    },
+    "royal_indigo": {
+        "name": "Royal Indigo (Elegância & Tech)",
+        "bg_top": (238, 242, 255),
+        "bg_bottom": (224, 231, 255),
+        "highlight": (79, 70, 229),     # Índigo Royal
+        "badge": (225, 29, 72),
+        "cta": (67, 56, 202),
+        "text_main": (30, 27, 75),
+        "text_muted": (100, 110, 135),
+    },
+    "golden_honey": {
+        "name": "Golden Honey (Utilidades / Gourmet / Praticidade)",
+        "bg_top": (254, 252, 232),
+        "bg_bottom": (254, 243, 199),
+        "highlight": (217, 119, 6),     # Dourado Âmbar
+        "badge": (220, 38, 38),
+        "cta": (180, 83, 9),
+        "text_main": (69, 26, 3),
+        "text_muted": (130, 100, 50),
+    }
+}
+
+# 📢 Headlines Virais com Variação Semântica (anti-OCR spam)
+VIRAL_HEADLINES: List[str] = [
+    "ACHADINHOS DA SHOPEE",
+    "DICA DE OURO DA SHOPEE",
+    "OFERTA RELÂMPAGO",
+    "TESTADO E APROVADO",
+    "ACHADO VIRAL SHOPEE",
+    "TENDÊNCIA DO MOMENTO",
+    "VALE CADA CENTAVO",
+    "SUPER RECOMENDADO",
+    "UTILIDADE INDISPENSÁVEL"
+]
+
 
 class PinImageEngine:
-    """Gera artes profissionais de 1000x1500 para o Pinterest."""
+    """Gera artes profissionais de 1000x1500 com variedade visual anti-spam."""
 
     WIDTH = 1000
     HEIGHT = 1500
@@ -85,25 +174,40 @@ class PinImageEngine:
         self,
         product: Dict[str, Any],
         template: str = "classic_deal",
-        custom_headline: str = "ACHADINHOS DA SHOPEE"
+        palette_key: str = "auto",
+        custom_headline: str = "auto"
     ) -> Image.Image:
         """
-        Cria a montagem vertical 1000x1500 para o Pinterest.
+        Cria a montagem vertical 1000x1500 com paletas e elementos dinâmicos.
+        - template: 'classic_deal', 'editorial_clean', 'viral_showcase' ou 'auto'
+        - palette_key: chave em COLOR_PALETTES ou 'auto' (sorteia paleta diferente para cada pin)
+        - custom_headline: texto superior ou 'auto' (sorteia frases virais para diversificar o OCR)
         """
-        # 1. Base Canvas 1000x1500
+        # 1. Seleciona Paleta de Cores
+        if palette_key == "auto" or palette_key not in COLOR_PALETTES:
+            chosen_palette = random.choice(list(COLOR_PALETTES.values()))
+        else:
+            chosen_palette = COLOR_PALETTES[palette_key]
+
+        # 2. Seleciona Headline
+        if custom_headline == "auto" or not custom_headline:
+            headline_text = random.choice(VIRAL_HEADLINES)
+        else:
+            headline_text = custom_headline.upper()
+
+        # 3. Base Canvas 1000x1500
         canvas = Image.new("RGBA", (self.WIDTH, self.HEIGHT), (255, 255, 255, 255))
         draw = ImageDraw.Draw(canvas)
 
-        # Paleta de Cores (Estilo Shopee / Pinterest)
-        cor_fundo_topo = (255, 248, 244)
-        cor_fundo_baixo = (255, 237, 230)
-        cor_destaque = (238, 77, 45)      # Laranja Shopee
-        cor_vermelho = (230, 0, 35)       # Vermelho Pinterest
-        cor_texto_escuro = (34, 34, 34)
-        cor_texto_cinza = (120, 120, 120)
-        cor_cta = (238, 77, 45)
+        cor_fundo_topo = chosen_palette["bg_top"]
+        cor_fundo_baixo = chosen_palette["bg_bottom"]
+        cor_destaque = chosen_palette["highlight"]
+        cor_badge = chosen_palette["badge"]
+        cor_cta = chosen_palette["cta"]
+        cor_texto_escuro = chosen_palette["text_main"]
+        cor_texto_cinza = chosen_palette["text_muted"]
 
-        # Gradiente de Fundo
+        # Gradiente Suave de Fundo
         for y in range(self.HEIGHT):
             ratio = y / self.HEIGHT
             r = int(cor_fundo_topo[0] * (1 - ratio) + cor_fundo_baixo[0] * ratio)
@@ -111,14 +215,12 @@ class PinImageEngine:
             b = int(cor_fundo_topo[2] * (1 - ratio) + cor_fundo_baixo[2] * ratio)
             draw.line([(0, y), (self.WIDTH, y)], fill=(r, g, b, 255))
 
-        # 2. Header / Badge Superior
+        # 4. Header / Badge Superior
         font_header = self._get_font("segoeuib.ttf", 30)
-        header_text = custom_headline.upper()
-        h_bbox = draw.textbbox((0, 0), header_text, font=font_header)
+        h_bbox = draw.textbbox((0, 0), headline_text, font=font_header)
         h_w = h_bbox[2] - h_bbox[0]
         h_h = h_bbox[3] - h_bbox[1]
 
-        # Pílula do cabeçalho
         pill_pad_x = 35
         pill_pad_y = 15
         pill_x1 = (self.WIDTH - h_w) // 2 - pill_pad_x
@@ -131,18 +233,17 @@ class PinImageEngine:
             radius=25,
             fill=cor_destaque
         )
-        # Centralização exata com anchor="mm"
         pill_cx = (pill_x1 + pill_x2) / 2
         pill_cy = (pill_y1 + pill_y2) / 2
         draw.text(
             (pill_cx, pill_cy),
-            header_text,
+            headline_text,
             font=font_header,
             fill=(255, 255, 255, 255),
             anchor="mm"
         )
 
-        # 3. Card do Produto com Foto
+        # 5. Card do Produto com Foto
         card_x1 = 70
         card_y1 = 160
         card_x2 = self.WIDTH - 70
@@ -173,21 +274,17 @@ class PinImageEngine:
         img_url = product.get("image_url", "")
         raw_img = self.download_image(img_url)
         if raw_img:
-            # Redimensiona preservando proporção dentro do card
             margem_interna = 24
             max_img_w = card_w - (margem_interna * 2)
             max_img_h = card_h - (margem_interna * 2)
 
             raw_img.thumbnail((max_img_w, max_img_h), Image.Resampling.LANCZOS)
-            
-            # Centraliza a imagem no card
             img_x = card_x1 + (card_w - raw_img.width) // 2
             img_y = card_y1 + (card_h - raw_img.height) // 2
 
-            # Mascara com cantos arredondados se a imagem preencher quase tudo
             canvas.paste(raw_img, (img_x, img_y), raw_img if raw_img.mode == "RGBA" else None)
 
-        # 4. Badge de Desconto Flutuante (se houver desconto)
+        # 6. Badge de Desconto Flutuante
         discount_pct = product.get("discount_pct", 0)
         if discount_pct and discount_pct > 0:
             badge_text = f"-{discount_pct}% OFF"
@@ -203,17 +300,15 @@ class PinImageEngine:
             bx2 = bx1 + b_w + (pad_x * 2)
             by2 = by1 + b_h + (pad_y * 2)
 
-            draw.rounded_rectangle([bx1, by1, bx2, by2], radius=20, fill=cor_vermelho)
+            draw.rounded_rectangle([bx1, by1, bx2, by2], radius=20, fill=cor_badge)
             badge_cx = (bx1 + bx2) / 2
             badge_cy = (by1 + by2) / 2
             draw.text((badge_cx, badge_cy), badge_text, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
 
-        # 5. Título do Produto
+        # 7. Título do Produto
         raw_title = product.get("title", "Produto Shopee")
         font_title = self._get_font("segoeuib.ttf", 38)
         title_lines = self._wrap_text(raw_title, font_title, self.WIDTH - 160, draw)
-        
-        # Limita a 2 linhas para ficar visualmente perfeito
         title_lines = title_lines[:2]
         title_y = 1040
         for line in title_lines:
@@ -222,13 +317,12 @@ class PinImageEngine:
             draw.text(((self.WIDTH - t_w) // 2, title_y), line, font=font_title, fill=cor_texto_escuro)
             title_y += 50
 
-        # 6. Preços (De / Por)
+        # 8. Preços (De / Por)
         orig_price = product.get("original_price", 0.0)
         disc_price = product.get("discount_price", 0.0)
 
         price_y = 1170
         if disc_price > 0:
-            # Se tem preço anterior, desenha com risco tachado
             if orig_price > disc_price:
                 font_orig = self._get_font("segoeui.ttf", 32)
                 orig_text = f"De R$ {orig_price:.2f}".replace(".", ",")
@@ -236,31 +330,26 @@ class PinImageEngine:
                 o_w = o_bbox[2] - o_bbox[0]
                 o_x = (self.WIDTH - o_w) // 2
                 draw.text((o_x, price_y), orig_text, font=font_orig, fill=cor_texto_cinza)
-                # Linha tachada
                 line_y = price_y + (o_bbox[3] - o_bbox[1]) // 2 + 3
                 draw.line([(o_x - 4, line_y), (o_x + o_w + 4, line_y)], fill=cor_texto_cinza, width=3)
                 price_y += 45
 
-            # Preço Promocional em Destaque Gigante
             font_price = self._get_font("segoeuib.ttf", 66)
             price_text = f"R$ {disc_price:.2f}".replace(".", ",")
             p_bbox = draw.textbbox((0, 0), price_text, font=font_price)
             p_w = p_bbox[2] - p_bbox[0]
             draw.text(((self.WIDTH - p_w) // 2, price_y), price_text, font=font_price, fill=cor_destaque)
 
-        # 7. Call To Action (Botão no Rodapé)
+        # 9. Call To Action (Botão no Rodapé com Cor Harmônica)
         cta_text = "CLIQUE NA IMAGEM PARA COMPRAR"
         font_cta = self._get_font("segoeuib.ttf", 34)
         c_bbox = draw.textbbox((0, 0), cta_text, font=font_cta)
-        c_w = c_bbox[2] - c_bbox[0]
-        c_h = c_bbox[3] - c_bbox[1]
 
         cta_x1 = 90
         cta_y1 = 1350
         cta_x2 = self.WIDTH - 90
         cta_y2 = 1430
 
-        # Sombra suave do botão CTA
         s_btn = Image.new("RGBA", (self.WIDTH, self.HEIGHT), (0, 0, 0, 0))
         sb_draw = ImageDraw.Draw(s_btn)
         sb_draw.rounded_rectangle([cta_x1, cta_y1 + 5, cta_x2, cta_y2 + 5], radius=40, fill=(0, 0, 0, 35))
@@ -287,4 +376,3 @@ class PinImageEngine:
         file_path = self.output_dir / f"{filename}.jpg"
         image.save(file_path, "JPEG", quality=92, optimize=True)
         return file_path
-
