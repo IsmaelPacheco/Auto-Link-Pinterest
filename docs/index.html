@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Achadinhos da Shopee • Vitrine Oficial</title>
+  
+  <!-- Meta tags sociais para TikTok / Instagram -->
+  <meta name="description" content="Encontre os links oficiais com desconto dos achadinhos do TikTok e Pinterest!">
+  <meta property="og:title" content="Achadinhos da Shopee • Vitrine Oficial">
+  <meta property="og:description" content="Digite o número do vídeo para encontrar a oferta oficial com cupom!">
+  <meta name="theme-color" content="#0B0F19">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            shopee: '#EE4D2D',
+            shopeeHover: '#D03B1C',
+            darkBg: '#0B0F19',
+            cardBg: '#111827',
+            cardBorder: '#1F2937',
+            brandPink: '#EC4899',
+            brandCyan: '#06B6D4'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0B0F19;
+      color: #F9FAFB;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .custom-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .badge-number {
+      background: linear-gradient(135deg, #EE4D2D 0%, #EC4899 100%);
+    }
+    .pulse-subtle {
+      animation: pulseSubtle 2.5s infinite;
+    }
+    @keyframes pulseSubtle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-shopee selection:text-white">
+
+  <!-- TOPO / HEADER DE IDENTIDADE -->
+  <header class="sticky top-0 z-40 bg-darkBg/90 backdrop-blur-md border-b border-cardBorder">
+    <div class="max-w-2xl mx-auto px-4 py-3">
+      
+      <!-- Linha do Perfil / Marca -->
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-full badge-number flex items-center justify-center text-white text-xl shadow-lg shadow-shopee/20 font-black">
+            🛍️
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h1 id="brandTitle" class="text-base font-bold text-white tracking-tight">Achadinhos Oficiais</h1>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                ✓ Verificado
+              </span>
+            </div>
+            <p class="text-xs text-gray-400">Links oficiais da Shopee com cupons ativos</p>
+          </div>
+        </div>
+
+        <!-- Seletor Rápido de Canal / Conta -->
+        <select id="accountFilter" class="bg-cardBg text-xs text-gray-300 border border-cardBorder rounded-lg px-2.5 py-1.5 outline-none focus:border-shopee transition">
+          <option value="all">Todas as Contas</option>
+          <option value="Achadinhos da Timy">🌸 Timy</option>
+          <option value="CupomZilla">🦖 CupomZilla</option>
+        </select>
+      </div>
+
+      <!-- BARRA DE PESQUISA POR NÚMERO OU NOME (DESTAQUE MÁXIMO) -->
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="🔍 Digite o número do vídeo (ex: 42) ou nome..."
+          class="w-full pl-11 pr-10 py-3 bg-cardBg border-2 border-cardBorder focus:border-shopee text-white rounded-xl text-sm placeholder-gray-500 outline-none transition shadow-inner font-medium"
+          autocomplete="off"
+        >
+        <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- CHIPS DE CATEGORIAS (ROLAGEM HORIZONTAL) -->
+      <div class="flex items-center gap-2 overflow-x-auto py-2.5 custom-scrollbar text-xs font-semibold whitespace-nowrap mt-1">
+        <button class="cat-pill active px-3 py-1.5 rounded-full bg-shopee text-white border border-shopee transition" data-cat="all">
+          Todos os Achadinhos
+        </button>
+        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Cozinha Prática">
+          🍳 Cozinha
+        </button>
+        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Casa & Organização">
+          🏠 Organização
+        </button>
+        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Gadgets & Setup">
+          ⚡ Gadgets
+        </button>
+        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Decoração & Estilo">
+          ✨ Decoração
+        </button>
+        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Beleza & Cuidados">
+          💄 Beleza
+        </button>
+        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Limpeza Inteligente">
+          🧹 Limpeza
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- BANNER DE AVISO / AJUDA -->
+  <div class="max-w-2xl mx-auto px-4 pt-3 pb-1 w-full">
+    <div class="bg-gradient-to-r from-orange-500/10 via-pink-500/10 to-transparent border border-shopee/20 rounded-xl p-3 flex items-center gap-3">
+      <span class="text-2xl">💡</span>
+      <p class="text-xs text-gray-300 leading-snug">
+        Viu um achadinho no <b class="text-white">TikTok</b> ou <b class="text-white">Pinterest</b>? Digite o <b class="text-shopee font-bold">número do vídeo</b> na barra acima para ir direto ao link com desconto!
+      </p>
+    </div>
+  </div>
+
+  <!-- CONTEÚDO PRINCIPAL / GRID DE PRODUTOS -->
+  <main class="flex-1 max-w-2xl mx-auto px-4 py-4 w-full">
+    
+    <!-- Contador de Resultados -->
+    <div class="flex items-center justify-between text-xs text-gray-400 mb-3 px-1">
+      <span id="resultsCount">Carregando ofertas...</span>
+      <span id="activeFilterLabel" class="text-shopee font-semibold"></span>
+    </div>
+
+    <!-- Grid de Cards de Produtos (1 coluna no celular, 2 em tablets) -->
+    <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+      <!-- Inserido dinamicamente via Javascript -->
+    </div>
+
+    <!-- Estado Vazio (Nenhum produto encontrado) -->
+    <div id="emptyState" class="hidden text-center py-16 px-4">
+      <div class="w-16 h-16 mx-auto rounded-full bg-cardBg border border-cardBorder flex items-center justify-center text-3xl mb-3">
+        🔍
+      </div>
+      <h3 class="text-base font-bold text-white mb-1">Nenhum achadinho encontrado</h3>
+      <p class="text-xs text-gray-400 max-w-xs mx-auto mb-4">
+        Não encontramos nenhum produto com esse número ou termo. Tente buscar por palavras como <i>"organizador"</i>, <i>"fone"</i> ou <i>"cozinha"</i>.
+      </p>
+      <button id="resetSearchBtn" class="px-4 py-2 bg-cardBg border border-cardBorder hover:border-shopee text-xs font-bold text-white rounded-lg transition">
+        Ver Todos os Achadinhos
+      </button>
+    </div>
+
+  </main>
+
+  <!-- RODAPÉ -->
+  <footer class="border-t border-cardBorder bg-darkBg py-6 px-4 text-center text-xs text-gray-500">
+    <div class="max-w-2xl mx-auto space-y-2">
+      <p class="font-medium text-gray-400">Vitrine Oficial de Achadinhos & Cupons</p>
+      <p class="text-[11px] text-gray-600">
+        Participamos do Programa de Afiliados da Shopee. Ao comprar pelos nossos links, você não paga nada a mais e apoia a curadoria diária de ofertas! 💖
+      </p>
+      <p class="text-[10px] text-gray-700 pt-2">© 2026 • AutoLink Showcase</p>
+    </div>
+  </footer>
+
+  <!-- JAVASCRIPT DA VITRINE -->
+  <script>
+    let allProducts = [];
+    let currentCategory = 'all';
+    let currentAccount = 'all';
+
+    const productsGrid = document.getElementById('productsGrid');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const resultsCount = document.getElementById('resultsCount');
+    const emptyState = document.getElementById('emptyState');
+    const resetSearchBtn = document.getElementById('resetSearchBtn');
+    const accountFilter = document.getElementById('accountFilter');
+    const catPills = document.querySelectorAll('.cat-pill');
+
+    // 1. Carrega dados do arquivo products.json
+    async function loadProducts() {
+      try {
+        const res = await fetch('data/products.json?v=' + Date.now());
+        if (!res.ok) throw new Error('Não foi possível carregar o arquivo products.json');
+        allProducts = await res.json();
+      } catch (err) {
+        console.warn('Carregando dados de demonstração (fallback)...', err);
+        allProducts = [
+          {
+            item_number: 42,
+            title: "Mini Processador Manual de Alimentos 3 Lâminas Inox",
+            original_price: 29.90,
+            discount_price: 11.95,
+            discount_percent: 60,
+            affiliate_link: "https://shopee.com.br",
+            category: "Cozinha Prática",
+            account_name: "Achadinhos da Timy"
+          },
+          {
+            item_number: 41,
+            title: "Suporte Articulado de Mesa para Monitor e Notebook",
+            original_price: 189.90,
+            discount_price: 89.90,
+            discount_percent: 53,
+            affiliate_link: "https://shopee.com.br",
+            category: "Gadgets & Setup",
+            account_name: "CupomZilla"
+          },
+          {
+            item_number: 40,
+            title: "Organizador Giratório 360 Graus para Temperos e Potes",
+            original_price: 45.00,
+            discount_price: 19.99,
+            discount_percent: 56,
+            affiliate_link: "https://shopee.com.br",
+            category: "Casa & Organização",
+            account_name: "Achadinhos da Timy"
+          }
+        ];
+      }
+
+      checkUrlParam();
+      render();
+    }
+
+    // 2. Renderiza os Cards de Produtos
+    function render() {
+      const query = searchInput.value.trim().toLowerCase();
+      clearSearchBtn.classList.toggle('hidden', query.length === 0);
+
+      // Filtra produtos
+      const filtered = allProducts.filter(p => {
+        // Filtro de Conta
+        if (currentAccount !== 'all') {
+          const accName = (p.account_name || '').toLowerCase();
+          if (!accName.includes(currentAccount.toLowerCase())) return false;
+        }
+
+        // Filtro de Categoria
+        if (currentCategory !== 'all') {
+          if ((p.category || '').toLowerCase() !== currentCategory.toLowerCase()) return false;
+        }
+
+        // Filtro de Busca (Número ou Termo)
+        if (query) {
+          const numStr = String(p.item_number);
+          const cleanQueryNum = query.replace('#', '').trim();
+          const matchNumber = numStr === cleanQueryNum || numStr.startsWith(cleanQueryNum);
+          const matchTitle = (p.title || '').toLowerCase().includes(query);
+          const matchCat = (p.category || '').toLowerCase().includes(query);
+          if (!matchNumber && !matchTitle && !matchCat) return false;
+        }
+
+        return true;
+      });
+
+      // Atualiza contador
+      resultsCount.textContent = `${filtered.length} achadinho(s) disponível(is)`;
+      
+      if (filtered.length === 0) {
+        productsGrid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      // Gera HTML dos Cards
+      productsGrid.innerHTML = filtered.map(p => {
+        const num = p.item_number || 1;
+        const discountBadge = p.discount_percent > 0 
+          ? `<span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded">-${p.discount_percent}% OFF</span>` 
+          : '';
+
+        const priceHtml = p.discount_price > 0
+          ? `
+            <div class="flex items-baseline gap-2">
+              <span class="text-base font-extrabold text-white">R$ ${p.discount_price.toFixed(2).replace('.', ',')}</span>
+              ${p.original_price > p.discount_price ? `<span class="text-xs text-gray-500 line-through">R$ ${p.original_price.toFixed(2).replace('.', ',')}</span>` : ''}
+            </div>
+          `
+          : `<span class="text-sm font-bold text-shopee">Confira o Preço</span>`;
+
+        return `
+          <div id="item-${num}" class="bg-cardBg border border-cardBorder rounded-2xl p-3.5 flex flex-col justify-between hover:border-shopee/60 transition shadow-lg relative overflow-hidden group">
+            
+            <!-- TOPO DO CARD: NÚMERO DE DESTAQUE + CATEGORIA -->
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <div class="badge-number text-white font-black text-xs px-2.5 py-1 rounded-lg shadow-md flex items-center gap-1 tracking-wide">
+                <span>#${num}</span>
+              </div>
+              <span class="text-[11px] font-medium text-gray-400 truncate max-w-[150px]">
+                ${p.category || 'Achadinho'}
+              </span>
+            </div>
+
+            <!-- TÍTULO DO PRODUTO -->
+            <h2 class="text-sm font-semibold text-gray-100 line-clamp-2 mb-3 leading-snug group-hover:text-shopee transition">
+              ${p.title}
+            </h2>
+
+            <!-- BLOCO DE PREÇO & DESCONTO -->
+            <div class="flex items-center justify-between gap-2 mb-3 bg-darkBg/60 px-3 py-2 rounded-xl border border-cardBorder">
+              ${priceHtml}
+              ${discountBadge}
+            </div>
+
+            <!-- BOTÃO DE AÇÃO: VER NA SHOPEE -->
+            <a 
+              href="${p.affiliate_link || '#'}" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="w-full py-2.5 px-4 bg-gradient-to-r from-shopee to-orange-600 hover:from-shopeeHover hover:to-orange-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md shadow-shopee/20 transition active:scale-[0.98]"
+            >
+              <span>Ver Oferta na Shopee</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+              </svg>
+            </a>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 3. Suporte a Parâmetros na URL (?p=42 ou #42)
+    function checkUrlParam() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramP = urlParams.get('p') || urlParams.get('id') || window.location.hash.replace('#', '');
+      if (paramP) {
+        searchInput.value = paramP;
+        setTimeout(() => {
+          const el = document.getElementById('item-' + paramP);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-shopee', 'pulse-subtle');
+          }
+        }, 300);
+      }
+    }
+
+    // 4. Listeners de Busca e Filtros
+    searchInput.addEventListener('input', render);
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      render();
+      searchInput.focus();
+    });
+
+    resetSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      currentCategory = 'all';
+      currentAccount = 'all';
+      accountFilter.value = 'all';
+      catPills.forEach(p => p.classList.toggle('active', p.dataset.cat === 'all'));
+      catPills.forEach(p => p.classList.toggle('bg-shopee', p.dataset.cat === 'all'));
+      catPills.forEach(p => p.classList.toggle('text-white', p.dataset.cat === 'all'));
+      render();
+    });
+
+    accountFilter.addEventListener('change', (e) => {
+      currentAccount = e.target.value;
+      render();
+    });
+
+    catPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        catPills.forEach(p => {
+          p.classList.remove('bg-shopee', 'text-white', 'border-shopee', 'active');
+          p.classList.add('bg-cardBg', 'text-gray-300', 'border-cardBorder');
+        });
+        pill.classList.remove('bg-cardBg', 'text-gray-300', 'border-cardBorder');
+        pill.classList.add('bg-shopee', 'text-white', 'border-shopee', 'active');
+        currentCategory = pill.dataset.cat;
+        render();
+      });
+    });
+
+    // Inicia carregamento
+    loadProducts();
+  </script>
+</body>
+</html>

@@ -313,7 +313,12 @@ class WorkerAutopilot(QThread):
                 affiliate_link = shopee.generate_affiliate_link(orig_link)
                 selected_product["affiliate_link"] = affiliate_link
 
-                # 6. Decide o Formato de Mídia (Vídeo Animado .mp4 ou Imagem Estática)
+                # 6. Atribui número sequencial do Achadinho para a Vitrine Web (#42)
+                item_num = self.db.get_next_item_number()
+                selected_product["item_number"] = item_num
+                self.sig_log.emit(f"🏷️ Achadinho #{item_num} atribuído para vitrine e vídeos.", "info")
+
+                # 7. Decide o Formato de Mídia (Vídeo Animado .mp4 ou Imagem Estática)
                 post_format = self.cfg.get("post_format", "hybrid")
                 if post_format == "hybrid":
                     # 50% chance de vídeo animado / 50% imagem estática (Equilíbrio de Ouro)
@@ -324,32 +329,34 @@ class WorkerAutopilot(QThread):
                     make_video = False
 
                 if make_video:
-                    self.sig_status.emit("Renderizando vídeo animado (.mp4) com zoom e efeitos...")
+                    self.sig_status.emit(f"Renderizando vídeo animado (# {item_num}) com zoom e efeitos...")
                     video_engine = PinVideoEngine()
                     media_path = video_engine.create_pin_video(
                         selected_product,
                         palette_key="auto",
                         custom_headline="auto",
-                        filename_prefix="auto_vid"
+                        filename_prefix="auto_vid",
+                        item_number=item_num
                     )
                     image_for_api = None
-                    self.sig_log.emit(f"🎬 Vídeo animado (.mp4) gerado com sucesso: {media_path.name}", "info")
+                    self.sig_log.emit(f"🎬 Vídeo animado (.mp4) com badge #{item_num} gerado: {media_path.name}", "info")
                 else:
-                    self.sig_status.emit("Renderizando imagem 1000x1500 com paleta dinâmica...")
+                    self.sig_status.emit(f"Renderizando imagem (# {item_num}) com paleta dinâmica...")
                     image_for_api = img_engine.create_pin_image(
                         selected_product,
                         template=self.cfg.get("image_template", "classic_deal"),
                         palette_key="auto",
-                        custom_headline="auto"
+                        custom_headline="auto",
+                        item_number=item_num
                     )
                     media_path = img_engine.save_pin_image(image_for_api, f"pin_{p_item_id}")
-                    self.sig_log.emit(f"🎨 Arte vertical 1000x1500 com cores dinâmicas gerada: {media_path.name}", "info")
+                    self.sig_log.emit(f"🎨 Arte vertical 1000x1500 com badge #{item_num} gerada: {media_path.name}", "info")
 
-                # 7. Gera Título e Descrição Otimizados
+                # 8. Gera Título e Descrição Otimizados
                 self.sig_status.emit("Elaborando título e descrição persuasiva...")
                 pin_title, pin_desc = copy_engine.generate_copy(selected_product)
 
-                # 8. Publica no Pinterest (Navegador Playwright ou API Oficial)
+                # 9. Publica no Pinterest (Navegador Playwright ou API Oficial)
                 post_method = self.cfg.get("post_method", "browser")
                 self.sig_status.emit(f"Publicando em '{board_name}'...")
 
@@ -373,7 +380,7 @@ class WorkerAutopilot(QThread):
                 else:
                     self.sig_log.emit(f"📤 Enviando Pin para a API oficial na pasta '{target_board}'...", "info")
                     if not image_for_api:
-                        image_for_api = img_engine.create_pin_image(selected_product, palette_key="auto", custom_headline="auto")
+                        image_for_api = img_engine.create_pin_image(selected_product, palette_key="auto", custom_headline="auto", item_number=item_num)
                     pin_result = pinterest.create_pin(
                         board_id=board_id,
                         title=pin_title,
@@ -385,7 +392,7 @@ class WorkerAutopilot(QThread):
                     pin_id = pin_result.get("pin_id", "")
                     pin_url = pin_result.get("pin_url", "")
 
-                # 9. Registra no banco SQLite local vinculado à conta
+                # 10. Registra no banco SQLite local vinculado à conta e com número do achadinho
                 self.db.add_pin(
                     shopee_item_id=p_item_id,
                     title=pin_title,
@@ -397,15 +404,26 @@ class WorkerAutopilot(QThread):
                     pinterest_board_id=board_id,
                     pinterest_url=pin_url,
                     status="SUCCESS",
-                    account_id=cur_account.id
+                    account_id=cur_account.id,
+                    item_number=item_num
                 )
+
+                # 11. Sincroniza automaticamente a Vitrine Própria de Achadinhos
+                try:
+                    from src.engines.vitrine_engine import VitrineEngine
+                    ve = VitrineEngine(self.db)
+                    ve.sync_vitrine()
+                    self.sig_log.emit(f"🛍️ Vitrine Web sincronizada com o Achadinho #{item_num}!", "success")
+                except Exception as ex_v:
+                    self.sig_log.emit(f"Aviso ao sincronizar vitrine: {ex_v}", "warning")
 
                 self.sig_log.emit(f"✅ Pin publicado com sucesso! Link: {pin_url}", "success")
                 self.sig_pin_published.emit({
                     "title": pin_title,
                     "url": pin_url,
                     "image_path": str(media_path),
-                    "affiliate_link": affiliate_link
+                    "affiliate_link": affiliate_link,
+                    "item_number": item_num
                 })
 
                 # 10. Calcula o próximo intervalo distribuído ao longo do dia

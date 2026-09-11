@@ -251,3 +251,29 @@ class CopyEngine:
         desc = match_desc.group(1).strip() if match_desc else self._generate_with_templates(product)[1]
 
         return title[:100], desc[:800]
+
+    def generate_tiktok_copy(self, product: Dict[str, Any], item_number: int) -> str:
+        """Gera copy com gancho viral específico para TikTok estimulando comentários 'QUERO'."""
+        p_title = product.get("title", "Achadinho Shopee")
+        disc_price = product.get("discount_price", 0.0)
+
+        hooks_tiktok = [
+            "Gente, para tudo e olha esse achadinho que encontrei na Shopee! 😱👇",
+            "Eu não dava nada por isso, mas se tornou indispensável aqui em casa! ✨",
+            "Se você gosta de praticidade e economia, precisa ver isso da Shopee! 💡",
+            "Olha a perfeição desse item da Shopee! Valeu cada centavo real! 🔥",
+            "Mais alguém é viciado em achadinhos úteis da Shopee? Olha esse! 🛒"
+        ]
+
+        hook = random.choice(hooks_tiktok)
+        price_str = f"por apenas R$ {disc_price:.2f}".replace(".", ",") if disc_price > 0 else "com super desconto"
+
+        copy = (
+            f"{hook}\n\n"
+            f"📦 {p_title}\n"
+            f"💰 Tá {price_str}!\n\n"
+            f"👉 O LINK é o Nº {item_number} na bio do perfil!\n"
+            f"💬 Comente \"EU QUERO\" que te respondo com o link também!\n\n"
+            f"#achadinhosshopee #shopeebrasil #achadinhos #tiktokmademebuyit #comprinhas"
+        )
+        return copy

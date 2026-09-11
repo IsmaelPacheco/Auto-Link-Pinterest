@@ -34,6 +34,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS posted_pins (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     account_id TEXT DEFAULT 'default',
+                    item_number INTEGER,
                     shopee_item_id TEXT UNIQUE,
                     title TEXT NOT NULL,
                     original_price REAL,
@@ -54,6 +55,17 @@ class Database:
             except Exception:
                 pass
 
+            try:
+                cursor.execute("ALTER TABLE posted_pins ADD COLUMN item_number INTEGER")
+            except Exception:
+                pass
+
+            # Preenche item_number para registros antigos que não possuem
+            try:
+                cursor.execute("UPDATE posted_pins SET item_number = id WHERE item_number IS NULL")
+            except Exception:
+                pass
+
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_shopee_item 
                 ON posted_pins (shopee_item_id)
@@ -61,6 +73,10 @@ class Database:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_account_today
                 ON posted_pins (account_id, created_at)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_item_number
+                ON posted_pins (item_number)
             """)
             conn.commit()
 
@@ -90,19 +106,24 @@ class Database:
         pinterest_url: Optional[str] = None,
         status: str = "SUCCESS",
         error_message: Optional[str] = None,
-        account_id: str = "default"
+        account_id: str = "default",
+        item_number: Optional[int] = None
     ) -> int:
-        """Registra uma publicação no banco de dados vinculada a uma conta."""
+        """Registra uma publicação no banco de dados vinculada a uma conta com numeração sequencial."""
+        if item_number is None:
+            item_number = self.get_next_item_number()
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO posted_pins (
-                    account_id, shopee_item_id, title, original_price, discount_price,
+                    account_id, item_number, shopee_item_id, title, original_price, discount_price,
                     affiliate_link, image_path, pinterest_pin_id,
                     pinterest_board_id, pinterest_url, status, error_message, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 str(account_id or "default"),
+                int(item_number),
                 str(shopee_item_id) if shopee_item_id else None,
                 title,
                 original_price,
@@ -118,6 +139,37 @@ class Database:
             ))
             conn.commit()
             return cursor.lastrowid
+
+    def get_next_item_number(self) -> int:
+        """Retorna o próximo número sequencial de achadinho para a vitrine (#1, #2, #3...)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT MAX(COALESCE(item_number, 0)) FROM posted_pins")
+            row = cursor.fetchone()
+            max_num = row[0] if (row and row[0] is not None) else 0
+            return int(max_num) + 1
+
+    def get_product_by_number(self, item_number: int) -> Optional[Dict[str, Any]]:
+        """Busca um produto específico pelo número do achadinho (#42)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM posted_pins WHERE item_number = ? LIMIT 1", (int(item_number),))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_all_vitrine_products(self) -> List[Dict[str, Any]]:
+        """Retorna todos os produtos aprovados ordenados pelo número do achadinho (do mais novo para o mais antigo)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, account_id, item_number, shopee_item_id, title, 
+                       original_price, discount_price, affiliate_link, image_path, 
+                       pinterest_url, created_at
+                FROM posted_pins
+                WHERE status = 'SUCCESS' AND affiliate_link IS NOT NULL
+                ORDER BY item_number DESC, id DESC
+            """)
+            return [dict(r) for r in cursor.fetchall()]
 
     def get_pins_posted_today_count(self, account_id: Optional[str] = None) -> int:
         """Retorna o número de pins postados com sucesso hoje (geral ou por conta)."""

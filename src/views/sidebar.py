@@ -33,18 +33,21 @@ class Sidebar(QWidget):
         self.btn_nav_dashboard = self._criar_botao_nav("🛍️   Criador Rápido", ativo=True)
         self.btn_nav_autopilot = self._criar_botao_nav("⚡   Piloto Automático", ativo=False)
         self.btn_nav_accounts = self._criar_botao_nav("👥   Multi-Contas", ativo=False)
+        self.btn_nav_vitrine = self._criar_botao_nav("🌐   Vitrine & TikTok", ativo=False)
         self.btn_nav_historico = self._criar_botao_nav("📊   Histórico de Pins", ativo=False)
         self.btn_nav_settings = self._criar_botao_nav("⚙️   Configurações", ativo=False)
 
         self.btn_nav_dashboard.clicked.connect(lambda: self._selecionar(0))
         self.btn_nav_autopilot.clicked.connect(lambda: self._selecionar(1))
         self.btn_nav_accounts.clicked.connect(lambda: self._selecionar(2))
-        self.btn_nav_historico.clicked.connect(lambda: self._selecionar(3))
-        self.btn_nav_settings.clicked.connect(lambda: self._selecionar(4))
+        self.btn_nav_vitrine.clicked.connect(lambda: self._selecionar(3))
+        self.btn_nav_historico.clicked.connect(lambda: self._selecionar(4))
+        self.btn_nav_settings.clicked.connect(lambda: self._selecionar(5))
 
         layout.addWidget(self.btn_nav_dashboard)
         layout.addWidget(self.btn_nav_autopilot)
         layout.addWidget(self.btn_nav_accounts)
+        layout.addWidget(self.btn_nav_vitrine)
         layout.addWidget(self.btn_nav_historico)
         layout.addWidget(self.btn_nav_settings)
 

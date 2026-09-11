@@ -115,10 +115,18 @@ def run_tests():
     vid_engine = PinVideoEngine()
     dummy_prod_img = Image.new("RGBA", (600, 600), (240, 100, 80, 255))
     vid_engine.img_engine.download_image = lambda url: dummy_prod_img
-    video_path = vid_engine.create_pin_video(prod_sample, filename_prefix="test_verification")
+    video_path = vid_engine.create_pin_video(prod_sample, filename_prefix="test_verification", item_number=42)
     assert video_path.exists(), "Arquivo de vídeo não foi criado!"
     assert video_path.stat().st_size > 5000, "Tamanho de vídeo muito pequeno!"
     print(f"[OK] PinVideoEngine OK! Video gerado: {video_path.name} ({video_path.stat().st_size} bytes, 1000x1500 px)")
+
+    # 7. Teste VitrineEngine (Sincronização da Vitrine Web)
+    print("\n[7/7] Testando VitrineEngine (Compilação e Sincronização Web)...")
+    from src.engines.vitrine_engine import VitrineEngine
+    ve = VitrineEngine(db)
+    res_vitrine = ve.sync_vitrine()
+    assert res_vitrine["success"] == True, f"Falha na sincronização da vitrine: {res_vitrine}"
+    print(f"[OK] VitrineEngine OK! Total de achadinhos indexados: {res_vitrine['total_products']}")
 
     # Bonus. Teste de importação da GUI PySide6
     print("\n[Bonus] Testando importacao de todas as paginas da interface...")

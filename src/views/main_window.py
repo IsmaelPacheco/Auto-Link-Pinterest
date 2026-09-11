@@ -22,6 +22,7 @@ from .header import Header
 from .dashboard_page import DashboardPage
 from .autopilot_page import AutopilotPage
 from .accounts_page import AccountsPage
+from .vitrine_page import VitrinePage
 from .history_page import HistoryPage
 from .settings_page import SettingsPage
 from .instructions_dialog import InstructionsDialog
@@ -30,8 +31,9 @@ TITULOS_PAGINA = [
     ("🛍️ Criador Rápido", "Busque ofertas na Shopee, pré-visualize o Pin e publique imediatamente"),
     ("⚡ Piloto Automático", "Esteira contínua com agendamento humanizado e proteção anti-spam"),
     ("👥 Multi-Contas", "Gerencie múltiplas contas nichadas do Pinterest com perfis e cookies isolados"),
+    ("🌐 Vitrine & TikTok", "Vitrine web mobile-first, busca por número (#42) e automação de comentários 'EU QUERO'"),
     ("📊 Histórico de Pins", "Rastreie todos os pins publicados com métricas e links diretos"),
-    ("⚙️ Configurações & APIs", "Gerencie suas chaves da Shopee Open Platform, Pinterest API e preferências")
+    ("⚙️ Configurações Globais", "Gerencie suas chaves da Shopee Open Platform, Google Gemini e preferências")
 ]
 
 
@@ -81,6 +83,7 @@ class MainWindow(QMainWindow):
         self.pagina_dashboard = DashboardPage(self.cfg, self.db)
         self.pagina_autopilot = AutopilotPage(self.cfg, self.db)
         self.pagina_accounts = AccountsPage(self.am, self.db)
+        self.pagina_vitrine = VitrinePage(self.db)
         self.pagina_historico = HistoryPage(self.db)
         self.pagina_settings = SettingsPage(self.cfg)
 
@@ -88,18 +91,21 @@ class MainWindow(QMainWindow):
         self.pagina_dashboard.sig_log.connect(self.sidebar.append_log)
         self.pagina_autopilot.sig_log.connect(self.sidebar.append_log)
         self.pagina_accounts.sig_log.connect(self.sidebar.append_log)
+        self.pagina_vitrine.sig_log.connect(self.sidebar.append_log)
         self.pagina_settings.sig_log.connect(self.sidebar.append_log)
 
-        # Atualização em tempo real de contas no Dashboard e Piloto Automático
+        # Atualização em tempo real de contas no Dashboard, Piloto Automático e Vitrine
         self.pagina_accounts.sig_accounts_changed.connect(self.pagina_dashboard._atualizar_contas_combo)
         self.pagina_accounts.sig_accounts_changed.connect(self.pagina_autopilot.atualizar_estatisticas)
+        self.pagina_accounts.sig_accounts_changed.connect(self.pagina_vitrine.atualizar_status)
 
         # Adicionar à pilha
         self.stacked_widget.addWidget(self.pagina_dashboard)  # 0
         self.stacked_widget.addWidget(self.pagina_autopilot)  # 1
         self.stacked_widget.addWidget(self.pagina_accounts)   # 2
-        self.stacked_widget.addWidget(self.pagina_historico)  # 3
-        self.stacked_widget.addWidget(self.pagina_settings)   # 4
+        self.stacked_widget.addWidget(self.pagina_vitrine)    # 3
+        self.stacked_widget.addWidget(self.pagina_historico)  # 4
+        self.stacked_widget.addWidget(self.pagina_settings)   # 5
 
         self._mudar_pagina(0)
         self._aplicar_tema()

@@ -175,13 +175,15 @@ class PinImageEngine:
         product: Dict[str, Any],
         template: str = "classic_deal",
         palette_key: str = "auto",
-        custom_headline: str = "auto"
+        custom_headline: str = "auto",
+        item_number: Optional[int] = None
     ) -> Image.Image:
         """
         Cria a montagem vertical 1000x1500 com paletas e elementos dinâmicos.
         - template: 'classic_deal', 'editorial_clean', 'viral_showcase' ou 'auto'
         - palette_key: chave em COLOR_PALETTES ou 'auto' (sorteia paleta diferente para cada pin)
         - custom_headline: texto superior ou 'auto' (sorteia frases virais para diversificar o OCR)
+        - item_number: número do achadinho na vitrine (#42)
         """
         # 1. Seleciona Paleta de Cores
         if palette_key == "auto" or palette_key not in COLOR_PALETTES:
@@ -190,7 +192,10 @@ class PinImageEngine:
             chosen_palette = COLOR_PALETTES[palette_key]
 
         # 2. Seleciona Headline
-        if custom_headline == "auto" or not custom_headline:
+        num = item_number or product.get("item_number")
+        if num:
+            headline_text = f"🔥 ACHADINHO #{num}"
+        elif custom_headline == "auto" or not custom_headline:
             headline_text = random.choice(VIRAL_HEADLINES)
         else:
             headline_text = custom_headline.upper()

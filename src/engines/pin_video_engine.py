@@ -40,13 +40,14 @@ class PinVideoEngine:
 
     def create_pin_video(
         self,
-        product: Dict[str, Any],
+        product: dict,
         palette_key: str = "auto",
         custom_headline: str = "auto",
-        filename_prefix: str = "pin"
+        filename_prefix: str = "pin_vid",
+        item_number: Optional[int] = None
     ) -> Path:
         """
-        Cria um vídeo vertical 1000x1500 em formato .mp4 com animações suaves em loop.
+        Gera um vídeo vertical MP4 (1000x1500, 24 FPS, ~5s) com efeitos dinâmicos.
         """
         item_id = str(product.get("item_id", "prod"))
         output_file = self.output_dir / f"{filename_prefix}_{item_id}.mp4"
@@ -57,7 +58,10 @@ class PinVideoEngine:
         else:
             chosen_palette = COLOR_PALETTES[palette_key]
 
-        if custom_headline == "auto" or not custom_headline:
+        num = item_number or product.get("item_number")
+        if num:
+            headline_text = f"🔥 ACHADINHO #{num}"
+        elif custom_headline == "auto" or not custom_headline:
             headline_text = random.choice(VIRAL_HEADLINES)
         else:
             headline_text = custom_headline.upper()

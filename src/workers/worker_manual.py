@@ -121,22 +121,29 @@ class WorkerPublishPin(QThread):
                 affiliate_link = shopee.generate_affiliate_link(orig_link)
                 self.product["affiliate_link"] = affiliate_link
 
-            # 2. Renderiza a mídia (Vídeo animado .mp4 ou Imagem 1000x1500)
+            # 2. Atribui número sequencial do Achadinho (#42)
+            item_num = self.db.get_next_item_number()
+            self.product["item_number"] = item_num
+            self.sig_log.emit(f"🏷️ Atribuído Achadinho #{item_num} para o produto.", "info")
+
+            # 3. Renderiza a mídia (Vídeo animado .mp4 ou Imagem 1000x1500)
             if self.post_format == "video":
-                self.sig_log.emit("🎬 Renderizando vídeo animado (.mp4) com zoom e efeitos...", "info")
+                self.sig_log.emit(f"🎬 Renderizando vídeo animado (.mp4) com badge #{item_num}...", "info")
                 video_engine = PinVideoEngine()
                 media_path = video_engine.create_pin_video(
                     self.product,
                     palette_key=self.palette_key,
-                    filename_prefix="manual"
+                    filename_prefix="manual",
+                    item_number=item_num
                 )
                 image_for_api = None
             else:
-                self.sig_log.emit("Renderizando montagem vertical 1000x1500...", "info")
+                self.sig_log.emit(f"Renderizando montagem vertical 1000x1500 com badge #{item_num}...", "info")
                 image_for_api = img_engine.create_pin_image(
                     self.product,
                     template=self.template,
-                    palette_key=self.palette_key
+                    palette_key=self.palette_key,
+                    item_number=item_num
                 )
                 media_path = img_engine.save_pin_image(image_for_api, f"manual_{self.product.get('item_id', 'pin')}")
 
@@ -174,7 +181,7 @@ class WorkerPublishPin(QThread):
                     access_token=self.cfg.get("pinterest_access_token", "")
                 )
                 if not image_for_api:
-                    image_for_api = img_engine.create_pin_image(self.product, template=self.template, palette_key=self.palette_key)
+                    image_for_api = img_engine.create_pin_image(self.product, template=self.template, palette_key=self.palette_key, item_number=item_num)
                 result = pinterest.create_pin(
                     board_id=self.board_id,
                     title=self.title,
@@ -186,7 +193,7 @@ class WorkerPublishPin(QThread):
                 pin_id = result.get("pin_id", "")
                 pin_url = result.get("pin_url", "")
 
-            # 4. Salva no banco SQLite local
+            # 4. Salva no banco SQLite local com item_number
             self.db.add_pin(
                 shopee_item_id=str(self.product.get("item_id", "")),
                 title=self.title,
@@ -198,14 +205,25 @@ class WorkerPublishPin(QThread):
                 pinterest_board_id=self.board_id,
                 pinterest_url=pin_url,
                 status="SUCCESS",
-                account_id=self.account_id
+                account_id=self.account_id,
+                item_number=item_num
             )
+
+            # 5. Sincroniza a Vitrine Web
+            try:
+                from src.engines.vitrine_engine import VitrineEngine
+                ve = VitrineEngine(self.db)
+                ve.sync_vitrine()
+                self.sig_log.emit(f"🛍️ Vitrine Web sincronizada com o Achadinho #{item_num}!", "success")
+            except Exception as ex_v:
+                self.sig_log.emit(f"Aviso ao sincronizar vitrine: {ex_v}", "warning")
 
             self.sig_log.emit(f"✅ Pin publicado com sucesso! {pin_url}", "success")
             self.sig_success.emit({
                 "pin_id": pin_id,
                 "pin_url": pin_url,
-                "image_path": str(media_path)
+                "image_path": str(media_path),
+                "item_number": item_num
             })
 
         except Exception as e:
