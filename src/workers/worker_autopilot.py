@@ -145,12 +145,13 @@ class WorkerAutopilot(QThread):
         # Divide os segundos restantes do dia pelas postagens restantes
         ideal_interval_secs = remaining_seconds / max(1, remaining_pins)
 
-        # Adiciona variação randômica humanizada (+/- 15%)
-        jitter_secs = int(ideal_interval_secs * 0.15)
+        # Adiciona variação randômica humanizada (+/- 20%)
+        # Quebra qualquer padrão mecânico de bot, emulando agendadores orgânicos como Tailwind
+        jitter_secs = int(ideal_interval_secs * 0.20)
         actual_delay_secs = int(ideal_interval_secs + random.randint(-jitter_secs, jitter_secs))
 
-        # Garante no mínimo 10 minutos entre postagens
-        actual_delay_secs = max(600, actual_delay_secs)
+        # Garante no mínimo 30 minutos entre postagens para blindagem contra filtros anti-bot
+        actual_delay_secs = max(1800, actual_delay_secs)
 
         delay_min = actual_delay_secs // 60
         next_time = now + timedelta(seconds=actual_delay_secs)

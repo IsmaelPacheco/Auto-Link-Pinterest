@@ -6,6 +6,7 @@ Suporta importação direta de cookies (Cookie-Editor) para não exigir 2FA nem 
 """
 import json
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -14,6 +15,11 @@ logger = logging.getLogger("AutoLink.PinterestBrowser")
 
 DEFAULT_PROFILE_DIR = Path("workspace") / "browser_profile"
 DEFAULT_COOKIES_FILE = Path("workspace") / "cookies.json"
+
+
+def human_delay(min_sec: float = 0.3, max_sec: float = 0.9):
+    """Pausa randômica para emular ritmo humano entre ações."""
+    time.sleep(random.uniform(min_sec, max_sec))
 
 
 def clean_cookies_for_playwright(raw_cookies: list) -> List[Dict[str, Any]]:
@@ -73,10 +79,25 @@ def safe_click(page, elem, timeout: int = 3000):
             logger.debug(f"Falha em safe_click: {e}")
 
 
+def human_move_and_click(page, elem, timeout: int = 3000):
+    """Move suavemente o cursor até o elemento antes de clicar para emular comportamento humano."""
+    try:
+        box = elem.bounding_box()
+        if box:
+            target_x = box["x"] + box["width"] * random.uniform(0.35, 0.65)
+            target_y = box["y"] + box["height"] * random.uniform(0.35, 0.65)
+            page.mouse.move(target_x, target_y, steps=random.randint(4, 8))
+            human_delay(0.15, 0.35)
+    except Exception:
+        pass
+    safe_click(page, elem, timeout=timeout)
+
+
 def safe_fill(page, elem, text: str):
     """Preenche o elemento de forma segura contra interceptações de DOM."""
     try:
-        elem.click(timeout=2000, force=True)
+        human_move_and_click(page, elem)
+        human_delay(0.1, 0.25)
         elem.fill(text, timeout=3000)
     except Exception:
         try:
@@ -246,6 +267,8 @@ class PinterestBrowserEngine:
                 context = p.chromium.launch_persistent_context(
                     user_data_dir=str(self.profile_dir.resolve()),
                     headless=headless,
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                    locale="pt-BR",
                     args=[
                         "--start-maximized",
                         "--disable-blink-features=AutomationControlled"
@@ -255,9 +278,17 @@ class PinterestBrowserEngine:
                 self._inject_saved_cookies(context)
                 page = context.new_page()
 
+                # Evasões anti-bot / stealth para simular navegador real
+                page.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                    window.chrome = { runtime: {} };
+                    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                """)
+
                 # Acessa o Criador de Pins oficial
                 page.goto("https://www.pinterest.com/pin-creation-tool/", timeout=45000)
-                time.sleep(4)
+                human_delay(3.0, 4.5)
 
                 # Fecha eventuais modais introdutórios do Pinterest
                 intro_selectors = [
@@ -403,8 +434,8 @@ class PinterestBrowserEngine:
                                 time.sleep(1)
                             board_item = page.query_selector(f'text="{board_name}"') or page.query_selector(f'[title*="{board_name}" i]')
                             if board_item:
-                                safe_click(page, board_item)
-                                time.sleep(1)
+                                human_move_and_click(page, board_item)
+                                human_delay(0.8, 1.5)
                             break
 
                 # 6. CLIQUE NO BOTÃO PUBLICAR
@@ -434,9 +465,9 @@ class PinterestBrowserEngine:
                 for sel in publish_btn_selectors:
                     btn = page.query_selector(sel)
                     if btn and btn.is_enabled():
-                        safe_click(page, btn)
+                        human_move_and_click(page, btn)
                         published = True
-                        time.sleep(8 if is_video else 6)
+                        time.sleep(random.uniform(7.0, 10.5) if is_video else random.uniform(4.5, 7.0))
                         break
 
                 # Salva cookies atualizados para manter a sessão sempre viva

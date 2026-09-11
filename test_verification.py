@@ -61,6 +61,9 @@ def run_tests():
     assert len(title) > 5 and len(title) <= 100
     assert len(desc) > 20 and len(desc) <= 800
     assert "#" in desc
+    assert "#linkdeafiliado" in desc
+    assert "afiliado" in desc.lower()
+    print("  Compliance de Afiliado verificado na descrição!")
     print("[OK] CopyEngine OK!")
 
     # 4. Teste PinImageEngine (Pillow 1000x1500)
