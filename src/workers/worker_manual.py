@@ -88,7 +88,8 @@ class WorkerPublishPin(QThread):
         database: Database,
         board_name: str = "",
         palette_key: str = "auto",
-        post_format: str = "image"
+        post_format: str = "image",
+        account_id: str = "default"
     ):
         super().__init__()
         self.product = product
@@ -101,6 +102,7 @@ class WorkerPublishPin(QThread):
         self.board_name = board_name
         self.palette_key = palette_key
         self.post_format = post_format
+        self.account_id = account_id
 
     def run(self):
         try:
@@ -144,7 +146,9 @@ class WorkerPublishPin(QThread):
                 # 3A. Publicação via Navegador Automatizado (Playwright)
                 tipo_midia = "Vídeo Animado (.mp4)" if self.post_format == "video" else "Imagem Vertical"
                 self.sig_log.emit(f"🌐 Publicando {tipo_midia} via Navegador Automatizado...", "info")
-                browser_engine = PinterestBrowserEngine()
+                from src.models.account_manager import AccountManager
+                am = AccountManager()
+                browser_engine = am.get_browser_engine_for_account(self.account_id)
                 headless = self.cfg.get("browser_headless", False)
                 
                 target_board = self.board_name or self.cfg.get("pinterest_board_name", "")
@@ -193,7 +197,8 @@ class WorkerPublishPin(QThread):
                 pinterest_pin_id=pin_id,
                 pinterest_board_id=self.board_id,
                 pinterest_url=pin_url,
-                status="SUCCESS"
+                status="SUCCESS",
+                account_id=self.account_id
             )
 
             self.sig_log.emit(f"✅ Pin publicado com sucesso! {pin_url}", "success")

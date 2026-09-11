@@ -16,6 +16,7 @@ from PySide6.QtCore import QThread, Signal
 
 from src.models.config_manager import ConfigManager
 from src.models.database import Database
+from src.models.account_manager import AccountManager
 from src.models.trending_catalog import TRENDING_NICHES, get_combined_viral_keywords
 from src.engines.shopee_engine import ShopeeEngine
 from src.engines.pinterest_engine import PinterestEngine
@@ -40,6 +41,7 @@ class WorkerAutopilot(QThread):
         super().__init__()
         self.cfg = config_manager
         self.db = database
+        self.am = AccountManager()
         self._running = True
 
     def stop(self):
@@ -102,15 +104,21 @@ class WorkerAutopilot(QThread):
         # Modo padrão: Distribuição Inteligente ao Longo do Dia
         start_hour = int(self.cfg.get("day_start_hour", 8))
         end_hour = int(self.cfg.get("day_end_hour", 22))
-        max_pins = int(self.cfg.get("max_pins_per_day", 10))
-        today_count = self.db.get_pins_posted_today_count()
 
-        # 1. Se já atingiu a meta do dia: aguarda até a manhã de amanhã
+        active_accounts = self.am.get_active_accounts()
+        if active_accounts:
+            max_pins = sum(acc.max_pins_per_day for acc in active_accounts)
+            today_count = sum(self.db.get_pins_posted_today_count(acc.id) for acc in active_accounts)
+        else:
+            max_pins = int(self.cfg.get("max_pins_per_day", 10))
+            today_count = self.db.get_pins_posted_today_count()
+
+        # 1. Se já atingiu a meta do dia de todas as contas: aguarda até a manhã de amanhã
         if today_count >= max_pins:
             tomorrow = (now + timedelta(days=1)).replace(hour=start_hour, minute=0, second=0, microsecond=0)
             secs_until_tomorrow = int((tomorrow - now).total_seconds())
             self.sig_log.emit(
-                f"🎉 Meta diária concluída ({today_count}/{max_pins} pins hoje)! "
+                f"🎉 Meta diária de todas as contas concluída ({today_count}/{max_pins} pins hoje)! "
                 f"Repousando até amanhã às {start_hour:02d}:00.",
                 "success"
             )
@@ -193,6 +201,7 @@ class WorkerAutopilot(QThread):
                 all_boards = [{"id": "", "name": "Pasta Padrão"}]
 
         rotation_index = 0
+        acc_rotation_index = 0
 
         while self._running:
             try:
@@ -200,42 +209,66 @@ class WorkerAutopilot(QThread):
                 schedule_mode = self.cfg.get("schedule_mode", "distributed_day")
                 start_hour = int(self.cfg.get("day_start_hour", 8))
                 end_hour = int(self.cfg.get("day_end_hour", 22))
-                max_pins = int(self.cfg.get("max_pins_per_day", 10))
-                pins_today = self.db.get_pins_posted_today_count()
+
+                # Atualiza contas ativas no momento
+                active_accounts = self.am.get_active_accounts()
+                if not active_accounts:
+                    self.sig_log.emit("⚠️ Nenhuma conta ativa no Multi-Contas. Cadastre uma conta na aba Multi-Contas.", "warning")
+                    self._sleep_with_check(120)
+                    continue
+
+                # Contas que ainda não atingiram sua meta diária
+                eligible_accounts = [
+                    acc for acc in active_accounts
+                    if self.db.get_pins_posted_today_count(acc.id) < acc.max_pins_per_day
+                ]
+                total_max = sum(acc.max_pins_per_day for acc in active_accounts)
+                total_today = sum(self.db.get_pins_posted_today_count(acc.id) for acc in active_accounts)
 
                 # 1. Verifica limites e horários da janela diária
                 if schedule_mode == "distributed_day":
                     start_today = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
                     end_today = now.replace(hour=end_hour, minute=0, second=0, microsecond=0)
 
-                    # Se já atingiu a meta ou está de noite/madrugada, entra em modo repouso
-                    if pins_today >= max_pins or now < start_today or now >= end_today:
+                    # Se já atingiu a meta de todas as contas ou está de noite/madrugada, entra em modo repouso
+                    if not eligible_accounts or now < start_today or now >= end_today:
                         wait_secs = self._calculate_next_delay()
-                        self.sig_status.emit(f"Repouso ({pins_today}/{max_pins} pins hoje)")
+                        self.sig_status.emit(f"Repouso ({total_today}/{total_max} pins hoje)")
                         self._sleep_with_check(wait_secs)
                         continue
                 else:
-                    if pins_today >= max_pins:
+                    if not eligible_accounts:
                         self.sig_log.emit(
-                            f"🛡️ Limite diário anti-spam atingido ({pins_today}/{max_pins} pins hoje). Aguardando próximo ciclo.",
+                            f"🛡️ Todas as contas atingiram a meta diária ({total_today}/{total_max} pins). Aguardando próximo ciclo.",
                             "warning"
                         )
-                        self.sig_status.emit(f"Pausa: Limite diário atingido ({pins_today}/{max_pins})")
+                        self.sig_status.emit(f"Pausa: Metas atingidas ({total_today}/{total_max})")
                         self._sleep_with_check(3600)
                         continue
 
-                # 2. Seleciona keyword de busca (Combina palavras configuradas com termos virais)
-                raw_keywords = self.cfg.get("search_keywords", "")
+                # 2. Seleciona a conta da vez no rodízio
+                cur_account = eligible_accounts[acc_rotation_index % len(eligible_accounts)]
+                acc_rotation_index += 1
+                acc_today = self.db.get_pins_posted_today_count(cur_account.id)
+
+                self.sig_log.emit(
+                    f"👥 Multi-Contas: Selecionada '{cur_account.name}' "
+                    f"({acc_today + 1}/{cur_account.max_pins_per_day} pins hoje • Nicho: {cur_account.niche})",
+                    "info"
+                )
+
+                # 3. Seleciona keyword de busca (Prioriza palavras da conta atual)
+                raw_keywords = cur_account.search_keywords or self.cfg.get("search_keywords", "")
                 user_keywords = [k.strip() for k in raw_keywords.split(",") if k.strip()]
 
                 viral_list = [kw for n in TRENDING_NICHES.values() for kw in n["keywords"]]
-                if user_keywords and random.random() < 0.7:
+                if user_keywords and random.random() < 0.8:
                     keyword = random.choice(user_keywords)
                 else:
                     keyword = random.choice(viral_list) if viral_list else "achadinhos"
 
-                self.sig_status.emit(f"Buscando ofertas para: '{keyword}'...")
-                self.sig_log.emit(f"🔍 Varrendo ofertas mais vendidas na Shopee: '{keyword}'...", "info")
+                self.sig_status.emit(f"[{cur_account.name}] Buscando: '{keyword}'...")
+                self.sig_log.emit(f"🔍 Varrendo ofertas mais vendidas na Shopee para '{cur_account.name}': '{keyword}'...", "info")
 
                 products = []
                 try:
@@ -249,7 +282,7 @@ class WorkerAutopilot(QThread):
                 except Exception as e:
                     self.sig_log.emit(f"⚠️ Erro ao consultar Shopee API: {e}", "warning")
 
-                # 3. Encontra um produto que ainda não foi postado
+                # 4. Encontra um produto que ainda não foi postado nesta conta
                 selected_product = None
                 for p in products:
                     item_id = p.get("item_id")
@@ -262,13 +295,14 @@ class WorkerAutopilot(QThread):
                     self._sleep_with_check(180)
                     continue
 
-                # 4. Seleciona a pasta de destino (Gerenciamento Automático)
+                # 5. Seleciona a pasta de destino (Gerenciamento da Conta)
                 current_mode = self.cfg.get("board_mode", "rotate")
                 board_id, board_name, motivo = self._select_board(
                     selected_product, all_boards, current_mode, rotation_index
                 )
                 rotation_index += 1
-                self.sig_log.emit(f"📁 Pasta de destino: '{board_name}' ({motivo})", "info")
+                target_board = cur_account.board_name or board_name
+                self.sig_log.emit(f"📁 Pasta de destino na conta '{cur_account.name}': '{target_board}'", "info")
 
                 # 5. Processa o produto escolhido
                 p_title = selected_product.get("title", "Produto Shopee")
@@ -321,15 +355,15 @@ class WorkerAutopilot(QThread):
 
                 if post_method == "browser":
                     tipo_desc = "Vídeo Animado (.mp4)" if make_video else "Imagem Vertical"
-                    self.sig_log.emit(f"🌐 Publicando {tipo_desc} via Navegador na pasta '{board_name}'...", "info")
-                    browser_engine = PinterestBrowserEngine()
+                    self.sig_log.emit(f"🌐 Publicando {tipo_desc} via Navegador na conta '{cur_account.name}' (pasta '{target_board}')...", "info")
+                    browser_engine = self.am.get_browser_engine_for_account(cur_account.id)
                     headless = self.cfg.get("browser_headless", False)
                     res_pin = browser_engine.publish_pin(
                         image_path=str(media_path),
                         title=pin_title,
                         description=pin_desc,
                         link=affiliate_link,
-                        board_name=board_name,
+                        board_name=target_board,
                         headless=headless
                     )
                     if not res_pin.get("success"):
@@ -337,7 +371,7 @@ class WorkerAutopilot(QThread):
                     pin_id = "browser_pin"
                     pin_url = res_pin.get("pin_url", "https://www.pinterest.com/")
                 else:
-                    self.sig_log.emit(f"📤 Enviando Pin para a API oficial na pasta '{board_name}'...", "info")
+                    self.sig_log.emit(f"📤 Enviando Pin para a API oficial na pasta '{target_board}'...", "info")
                     if not image_for_api:
                         image_for_api = img_engine.create_pin_image(selected_product, palette_key="auto", custom_headline="auto")
                     pin_result = pinterest.create_pin(
@@ -351,7 +385,7 @@ class WorkerAutopilot(QThread):
                     pin_id = pin_result.get("pin_id", "")
                     pin_url = pin_result.get("pin_url", "")
 
-                # 9. Registra no banco SQLite local
+                # 9. Registra no banco SQLite local vinculado à conta
                 self.db.add_pin(
                     shopee_item_id=p_item_id,
                     title=pin_title,
@@ -362,7 +396,8 @@ class WorkerAutopilot(QThread):
                     pinterest_pin_id=pin_id,
                     pinterest_board_id=board_id,
                     pinterest_url=pin_url,
-                    status="SUCCESS"
+                    status="SUCCESS",
+                    account_id=cur_account.id
                 )
 
                 self.sig_log.emit(f"✅ Pin publicado com sucesso! Link: {pin_url}", "success")

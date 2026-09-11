@@ -15,11 +15,13 @@ from PySide6.QtCore import Qt
 
 from src.models.config_manager import ConfigManager
 from src.models.database import Database
+from src.models.account_manager import AccountManager
 from .theme import ThemeManager
 from .sidebar import Sidebar
 from .header import Header
 from .dashboard_page import DashboardPage
 from .autopilot_page import AutopilotPage
+from .accounts_page import AccountsPage
 from .history_page import HistoryPage
 from .settings_page import SettingsPage
 from .instructions_dialog import InstructionsDialog
@@ -27,6 +29,7 @@ from .instructions_dialog import InstructionsDialog
 TITULOS_PAGINA = [
     ("🛍️ Criador Rápido", "Busque ofertas na Shopee, pré-visualize o Pin e publique imediatamente"),
     ("⚡ Piloto Automático", "Esteira contínua com agendamento humanizado e proteção anti-spam"),
+    ("👥 Multi-Contas", "Gerencie múltiplas contas nichadas do Pinterest com perfis e cookies isolados"),
     ("📊 Histórico de Pins", "Rastreie todos os pins publicados com métricas e links diretos"),
     ("⚙️ Configurações & APIs", "Gerencie suas chaves da Shopee Open Platform, Pinterest API e preferências")
 ]
@@ -37,6 +40,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.cfg = ConfigManager()
         self.db = Database()
+        self.am = AccountManager()
         self.tema = ThemeManager()
         self.is_dark_mode = self.cfg.get("dark_mode", True)
 
@@ -76,19 +80,25 @@ class MainWindow(QMainWindow):
         # Instanciar Páginas
         self.pagina_dashboard = DashboardPage(self.cfg, self.db)
         self.pagina_autopilot = AutopilotPage(self.cfg, self.db)
+        self.pagina_accounts = AccountsPage(self.am, self.db)
         self.pagina_historico = HistoryPage(self.db)
         self.pagina_settings = SettingsPage(self.cfg)
 
         # Conectar Logs de todas as páginas ao terminal da Sidebar
         self.pagina_dashboard.sig_log.connect(self.sidebar.append_log)
         self.pagina_autopilot.sig_log.connect(self.sidebar.append_log)
+        self.pagina_accounts.sig_log.connect(self.sidebar.append_log)
         self.pagina_settings.sig_log.connect(self.sidebar.append_log)
+
+        # Atualização em tempo real de contas no Dashboard
+        self.pagina_accounts.sig_accounts_changed.connect(self.pagina_dashboard._atualizar_contas_combo)
 
         # Adicionar à pilha
         self.stacked_widget.addWidget(self.pagina_dashboard)  # 0
         self.stacked_widget.addWidget(self.pagina_autopilot)  # 1
-        self.stacked_widget.addWidget(self.pagina_historico)  # 2
-        self.stacked_widget.addWidget(self.pagina_settings)   # 3
+        self.stacked_widget.addWidget(self.pagina_accounts)   # 2
+        self.stacked_widget.addWidget(self.pagina_historico)  # 3
+        self.stacked_widget.addWidget(self.pagina_settings)   # 4
 
         self._mudar_pagina(0)
         self._aplicar_tema()

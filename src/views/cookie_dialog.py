@@ -3,6 +3,8 @@ cookie_dialog.py
 Diálogo visual para importação rápida de cookies do Pinterest via JSON (Cookie-Editor).
 Permite ao usuário conectar instantaneamente sua conta do Pinterest sem precisar de 2FA.
 """
+from typing import Optional
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit,
     QPushButton, QMessageBox
@@ -16,8 +18,9 @@ from src.engines.pinterest_browser_engine import PinterestBrowserEngine
 class CookieImportDialog(QDialog):
     """Janela modal para colar e validar cookies do Pinterest."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, browser_engine: Optional[PinterestBrowserEngine] = None):
         super().__init__(parent)
+        self.browser_engine = browser_engine or PinterestBrowserEngine()
         self.setWindowTitle("🔑 Importar Sessão do Pinterest via Cookies")
         self.setMinimumSize(550, 420)
         self.setStyleSheet("""
@@ -103,8 +106,7 @@ class CookieImportDialog(QDialog):
         self.btn_save.setText("Validando cookies...")
 
         try:
-            engine = PinterestBrowserEngine()
-            res = engine.import_cookies(raw_text)
+            res = self.browser_engine.import_cookies(raw_text)
 
             if res.get("success"):
                 QMessageBox.information(self, "Sucesso!", res.get("message"))

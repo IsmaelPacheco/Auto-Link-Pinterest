@@ -45,6 +45,16 @@ def run_tests():
     assert len(pins) > 0
     print(f"[OK] Database OK! Total pins no banco: {len(pins)}")
 
+    # 2B. Teste AccountManager (Multi-Contas)
+    print("\n[2B] Testando AccountManager (Multi-Contas)...")
+    from src.models.account_manager import AccountManager
+    am = AccountManager()
+    accs = am.get_all_accounts()
+    assert len(accs) >= 1, "Nenhuma conta encontrada!"
+    default_acc = am.get_account("default")
+    assert default_acc is not None, "Conta padrão não encontrada!"
+    print(f"[OK] AccountManager OK! Total de contas cadastradas: {len(accs)}")
+
     # 3. Teste CopyEngine
     print("\n[3/5] Testando CopyEngine...")
     from src.engines.copy_engine import CopyEngine

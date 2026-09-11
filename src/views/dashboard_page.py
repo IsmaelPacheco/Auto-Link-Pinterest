@@ -17,6 +17,7 @@ from PIL import Image
 
 from src.models.config_manager import ConfigManager
 from src.models.database import Database
+from src.models.account_manager import AccountManager
 from src.models.trending_catalog import TRENDING_NICHES, SORT_OPTIONS
 from src.engines.pin_image_engine import PinImageEngine
 from src.engines.copy_engine import CopyEngine
@@ -33,6 +34,7 @@ class DashboardPage(QWidget):
         super().__init__(parent)
         self.cfg = config_manager
         self.db = database
+        self.am = AccountManager()
         self.img_engine = PinImageEngine()
         self.copy_engine = CopyEngine(
             gemini_key=self.cfg.get("gemini_key", "") or self.cfg.get("gemini_api_key", ""),
@@ -260,6 +262,19 @@ class DashboardPage(QWidget):
         box_format.addWidget(self.combo_format)
         layout_form.addLayout(box_format)
 
+        # Seletor de Conta do Pinterest (Multi-Account)
+        box_account = QHBoxLayout()
+        box_account.setSpacing(8)
+        lbl_acc = QLabel("👤 Publicar na Conta:")
+        lbl_acc.setStyleSheet("font-weight: bold; color: #E5E7EB; font-size: 12px;")
+        box_account.addWidget(lbl_acc)
+
+        self.combo_account = QComboBox()
+        self.combo_account.setStyleSheet("background: #1F2937; color: white; border-radius: 4px; padding: 6px; font-size: 12px;")
+        self._atualizar_contas_combo()
+        box_account.addWidget(self.combo_account)
+        layout_form.addLayout(box_account)
+
         layout_form.addWidget(QLabel("📌 Título do Pin (Pinterest):"))
         self.input_pin_title = QLineEdit()
         self.input_pin_title.setPlaceholderText("Título chamativo...")
@@ -444,6 +459,14 @@ class DashboardPage(QWidget):
         data = rgb_image.tobytes("raw", "RGB")
         return QImage(data, rgb_image.width, rgb_image.height, rgb_image.width * 3, QImage.Format_RGB888)
 
+    def _atualizar_contas_combo(self):
+        if not hasattr(self, "combo_account") or not hasattr(self, "am"):
+            return
+        self.combo_account.clear()
+        for acc in self.am.get_all_accounts():
+            status = "🟢" if acc.has_cookies() else "🔴"
+            self.combo_account.addItem(f"{status} {acc.name} ({acc.niche})", acc.id)
+
     def _publicar_pin_agora(self):
         if not self.current_product or not self.current_pil_image:
             QMessageBox.warning(self, "Atenção", "Selecione um produto e gere a imagem antes de publicar.")
@@ -454,6 +477,7 @@ class DashboardPage(QWidget):
         post_method = self.cfg.get("post_method", "browser")
         palette_key = self.combo_palette.currentData() or "auto"
         post_format = self.combo_format.currentData() or "image"
+        account_id = self.combo_account.currentData() or "default"
 
         if post_method == "api" and not board_id:
             QMessageBox.warning(self, "Atenção", "Selecione uma pasta do Pinterest nas Configurações.")
@@ -478,7 +502,8 @@ class DashboardPage(QWidget):
             database=self.db,
             board_name=board_name,
             palette_key=palette_key,
-            post_format=post_format
+            post_format=post_format,
+            account_id=account_id
         )
         self._worker_publish.sig_log.connect(self.sig_log.emit)
         self._worker_publish.sig_success.connect(self._on_publish_success)
