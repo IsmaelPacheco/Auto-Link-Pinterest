@@ -33,6 +33,7 @@ class Database:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS posted_pins (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_id TEXT DEFAULT 'default',
                     shopee_item_id TEXT UNIQUE,
                     title TEXT NOT NULL,
                     original_price REAL,
@@ -47,9 +48,19 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Migração segura para bancos existentes
+            try:
+                cursor.execute("ALTER TABLE posted_pins ADD COLUMN account_id TEXT DEFAULT 'default'")
+            except Exception:
+                pass
+
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_shopee_item 
                 ON posted_pins (shopee_item_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_account_today
+                ON posted_pins (account_id, created_at)
             """)
             conn.commit()
 
@@ -78,18 +89,20 @@ class Database:
         pinterest_board_id: Optional[str] = None,
         pinterest_url: Optional[str] = None,
         status: str = "SUCCESS",
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
+        account_id: str = "default"
     ) -> int:
-        """Registra uma publicação no banco de dados."""
+        """Registra uma publicação no banco de dados vinculada a uma conta."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO posted_pins (
-                    shopee_item_id, title, original_price, discount_price,
+                    account_id, shopee_item_id, title, original_price, discount_price,
                     affiliate_link, image_path, pinterest_pin_id,
                     pinterest_board_id, pinterest_url, status, error_message, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
+                str(account_id or "default"),
                 str(shopee_item_id) if shopee_item_id else None,
                 title,
                 original_price,
@@ -106,17 +119,35 @@ class Database:
             conn.commit()
             return cursor.lastrowid
 
-    def get_pins_posted_today_count(self) -> int:
-        """Retorna o número de pins postados com sucesso hoje."""
+    def get_pins_posted_today_count(self, account_id: Optional[str] = None) -> int:
+        """Retorna o número de pins postados com sucesso hoje (geral ou por conta)."""
+        today_str = date.today().strftime("%Y-%m-%d")
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if account_id:
+                cursor.execute("""
+                    SELECT COUNT(*) FROM posted_pins
+                    WHERE status = 'SUCCESS' AND account_id = ? AND created_at >= ?
+                """, (account_id, f"{today_str} 00:00:00"))
+            else:
+                cursor.execute("""
+                    SELECT COUNT(*) FROM posted_pins
+                    WHERE status = 'SUCCESS' AND created_at >= ?
+                """, (f"{today_str} 00:00:00",))
+            row = cursor.fetchone()
+            return row[0] if row else 0
+
+    def get_pins_count_per_account_today(self) -> Dict[str, int]:
+        """Retorna contagem de pins postados hoje agrupados por conta."""
         today_str = date.today().strftime("%Y-%m-%d")
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT COUNT(*) FROM posted_pins
+                SELECT account_id, COUNT(*) FROM posted_pins
                 WHERE status = 'SUCCESS' AND created_at >= ?
+                GROUP BY account_id
             """, (f"{today_str} 00:00:00",))
-            row = cursor.fetchone()
-            return row[0] if row else 0
+            return {row[0]: row[1] for row in cursor.fetchall()}
 
     def get_all_pins(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         """Retorna lista de pins postados para exibição na interface."""

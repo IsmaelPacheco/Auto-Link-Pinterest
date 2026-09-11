@@ -44,10 +44,17 @@ CTAS = [
     "Toque na foto para acessar a loja oficial e conferir mais fotos!"
 ]
 
+AFFILIATE_DISCLOSURES = [
+    "📌 Nota de transparência: Link de afiliado oficial. Ao comprar por ele, você apoia meu trabalho sem pagar nada a mais por isso!",
+    "📌 Divulgação: Este pin contém link de afiliado oficial da Shopee. Posso receber uma pequena comissão por compras qualificadas.",
+    "📌 Transparência: Link de afiliado Shopee. Você garante o menor preço e ajuda a manter as dicas ativas!"
+]
+
 HASHTAG_POOLS = [
     "#achadinhosshopee", "#shopeebrasil", "#achadinhos", "#comprinhas",
     "#promocao", "#ofertas", "#utilidades", "#dicas", "#comprasshopee",
-    "#casaorganizada", "#decoracao", "#praticidade", "#achadosshopee"
+    "#casaorganizada", "#decoracao", "#praticidade", "#achadosshopee",
+    "#linkdeafiliado", "#afiliadoshopee", "#publi"
 ]
 
 
@@ -170,7 +177,11 @@ class CopyEngine:
                 price_info = f"💰 Por apenas R$ {disc_price:.2f}!".replace(".", ",")
 
         selected_tags = random.sample(HASHTAG_POOLS, k=min(6, len(HASHTAG_POOLS)))
+        if "#linkdeafiliado" not in selected_tags:
+            selected_tags.append("#linkdeafiliado")
         tags_str = " ".join(selected_tags)
+
+        disclosure = random.choice(AFFILIATE_DISCLOSURES)
 
         desc_parts = [
             hook,
@@ -178,6 +189,7 @@ class CopyEngine:
             benefit,
             price_info,
             f"\n{cta}",
+            f"\n{disclosure}",
             f"\n{tags_str}"
         ]
         description = "\n".join([p for p in desc_parts if p.strip()])
@@ -201,8 +213,9 @@ class CopyEngine:
         Regras Específicas:
         1. O Título deve ter NO MÁXIMO 80 caracteres. Deve ser chamativo, direto e sem clickbait falso.
         2. A Descrição deve ter entre 150 e 400 caracteres, escrita em tom autêntico de recomendação pessoal/resenha.
-        3. Inclua no final da descrição uma chamada para ação clara (ex: "Toque na imagem para ver o desconto na Shopee") e 5 a 6 hashtags relevantes em português.
-        4. Responda ESTRITAMENTE no seguinte formato:
+        3. Inclua no final da descrição uma chamada para ação clara (ex: "Toque na imagem para ver o desconto na Shopee").
+        4. OBRIGATÓRIO (Transparência / Compliance do Pinterest): Inclua no rodapé uma frase curta de divulgação de afiliado (ex: "📌 Link de afiliado Shopee") e hashtags como #linkdeafiliado #shopeebrasil #achadinhos.
+        5. Responda ESTRITAMENTE no seguinte formato:
         TITULO: [texto do título aqui]
         DESCRICAO: [texto da descrição aqui]
         """

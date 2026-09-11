@@ -32,16 +32,19 @@ class Sidebar(QWidget):
         # BOTÕES DE NAVEGAÇÃO
         self.btn_nav_dashboard = self._criar_botao_nav("🛍️   Criador Rápido", ativo=True)
         self.btn_nav_autopilot = self._criar_botao_nav("⚡   Piloto Automático", ativo=False)
+        self.btn_nav_accounts = self._criar_botao_nav("👥   Multi-Contas", ativo=False)
         self.btn_nav_historico = self._criar_botao_nav("📊   Histórico de Pins", ativo=False)
         self.btn_nav_settings = self._criar_botao_nav("⚙️   Configurações", ativo=False)
 
         self.btn_nav_dashboard.clicked.connect(lambda: self._selecionar(0))
         self.btn_nav_autopilot.clicked.connect(lambda: self._selecionar(1))
-        self.btn_nav_historico.clicked.connect(lambda: self._selecionar(2))
-        self.btn_nav_settings.clicked.connect(lambda: self._selecionar(3))
+        self.btn_nav_accounts.clicked.connect(lambda: self._selecionar(2))
+        self.btn_nav_historico.clicked.connect(lambda: self._selecionar(3))
+        self.btn_nav_settings.clicked.connect(lambda: self._selecionar(4))
 
         layout.addWidget(self.btn_nav_dashboard)
         layout.addWidget(self.btn_nav_autopilot)
+        layout.addWidget(self.btn_nav_accounts)
         layout.addWidget(self.btn_nav_historico)
         layout.addWidget(self.btn_nav_settings)
 

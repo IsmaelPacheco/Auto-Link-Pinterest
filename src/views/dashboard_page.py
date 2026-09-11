@@ -17,6 +17,7 @@ from PIL import Image
 
 from src.models.config_manager import ConfigManager
 from src.models.database import Database
+from src.models.account_manager import AccountManager
 from src.models.trending_catalog import TRENDING_NICHES, SORT_OPTIONS
 from src.engines.pin_image_engine import PinImageEngine
 from src.engines.copy_engine import CopyEngine
@@ -33,6 +34,7 @@ class DashboardPage(QWidget):
         super().__init__(parent)
         self.cfg = config_manager
         self.db = database
+        self.am = AccountManager()
         self.img_engine = PinImageEngine()
         self.copy_engine = CopyEngine(
             gemini_key=self.cfg.get("gemini_key", "") or self.cfg.get("gemini_api_key", ""),
@@ -207,6 +209,34 @@ class DashboardPage(QWidget):
         self.lbl_image_preview.setAlignment(Qt.AlignCenter)
         self.lbl_image_preview.setText("Nenhum produto\nselecionado")
         box_preview.addWidget(self.lbl_image_preview)
+
+        # Seletor de Paleta de Cores
+        box_palette = QHBoxLayout()
+        box_palette.setSpacing(6)
+        lbl_pal = QLabel("🎨 Paleta:")
+        lbl_pal.setStyleSheet("color: #9CA3AF; font-size: 11px; font-weight: bold;")
+        box_palette.addWidget(lbl_pal)
+
+        self.combo_palette = QComboBox()
+        self.combo_palette.addItem("🎲 Aleatório (Rotativo)", "auto")
+        self.combo_palette.addItem("🔥 Shopee Warm", "shopee_warm")
+        self.combo_palette.addItem("✨ Clean Nordic", "clean_nordic")
+        self.combo_palette.addItem("💄 Rose Gold", "rose_gold")
+        self.combo_palette.addItem("🌿 Fresh Mint", "fresh_mint")
+        self.combo_palette.addItem("💜 Lavender Dream", "lavender_modern")
+        self.combo_palette.addItem("💎 Royal Indigo", "royal_indigo")
+        self.combo_palette.addItem("🍯 Golden Honey", "golden_honey")
+        self.combo_palette.setStyleSheet("background: #1F2937; color: white; border-radius: 4px; padding: 4px; font-size: 11px;")
+        self.combo_palette.currentIndexChanged.connect(self._on_palette_changed)
+        box_palette.addWidget(self.combo_palette)
+        box_preview.addLayout(box_palette)
+
+        self.btn_new_art = QPushButton("🎲 Nova Variação Visual")
+        self.btn_new_art.setCursor(Qt.PointingHandCursor)
+        self.btn_new_art.setStyleSheet("background-color: #374151; color: #E5E7EB; padding: 6px; border-radius: 6px; font-size: 11px;")
+        self.btn_new_art.clicked.connect(self._regenerar_variacao_arte)
+        box_preview.addWidget(self.btn_new_art)
+
         layout_right.addLayout(box_preview)
 
         # FORMULÁRIO DE PUBLICAÇÃO
@@ -217,6 +247,33 @@ class DashboardPage(QWidget):
         container_form = QWidget()
         layout_form = QVBoxLayout(container_form)
         layout_form.setSpacing(12)
+
+        # Seletor de Formato de Mídia
+        box_format = QHBoxLayout()
+        box_format.setSpacing(8)
+        lbl_fmt = QLabel("🎬 Formato do Pin:")
+        lbl_fmt.setStyleSheet("font-weight: bold; color: #E5E7EB; font-size: 12px;")
+        box_format.addWidget(lbl_fmt)
+
+        self.combo_format = QComboBox()
+        self.combo_format.addItem("📌 Imagem Estática (1000x1500)", "image")
+        self.combo_format.addItem("🎬 Vídeo Animado (.MP4 com Zoom & Pulso)", "video")
+        self.combo_format.setStyleSheet("background: #1F2937; color: white; border-radius: 4px; padding: 6px; font-size: 12px;")
+        box_format.addWidget(self.combo_format)
+        layout_form.addLayout(box_format)
+
+        # Seletor de Conta do Pinterest (Multi-Account)
+        box_account = QHBoxLayout()
+        box_account.setSpacing(8)
+        lbl_acc = QLabel("👤 Publicar na Conta:")
+        lbl_acc.setStyleSheet("font-weight: bold; color: #E5E7EB; font-size: 12px;")
+        box_account.addWidget(lbl_acc)
+
+        self.combo_account = QComboBox()
+        self.combo_account.setStyleSheet("background: #1F2937; color: white; border-radius: 4px; padding: 6px; font-size: 12px;")
+        self._atualizar_contas_combo()
+        box_account.addWidget(self.combo_account)
+        layout_form.addLayout(box_account)
 
         layout_form.addWidget(QLabel("📌 Título do Pin (Pinterest):"))
         self.input_pin_title = QLineEdit()
@@ -360,9 +417,28 @@ class DashboardPage(QWidget):
         self.input_pin_link.setText(product.get("affiliate_link") or product.get("product_link", ""))
 
         # 2. Gera Imagem 1000x1500
+        self._renderizar_preview_imagem()
+
+    def _on_palette_changed(self, index: int):
+        if self.current_product:
+            self._renderizar_preview_imagem()
+
+    def _regenerar_variacao_arte(self):
+        if self.current_product:
+            self.sig_log.emit("🎨 Gerando nova variação de cores e layout...", "info")
+            self._renderizar_preview_imagem()
+
+    def _renderizar_preview_imagem(self):
+        if not self.current_product:
+            return
         try:
-            self.sig_log.emit("Gerando preview da montagem 1000x1500...", "info")
-            pil_img = self.img_engine.create_pin_image(product)
+            palette_key = self.combo_palette.currentData() or "auto"
+            self.sig_log.emit(f"Gerando preview da montagem 1000x1500 (Paleta: {palette_key})...", "info")
+            pil_img = self.img_engine.create_pin_image(
+                self.current_product,
+                palette_key=palette_key,
+                custom_headline="auto"
+            )
             self.current_pil_image = pil_img
 
             # Converte PIL para QPixmap escalonado
@@ -383,13 +459,27 @@ class DashboardPage(QWidget):
         data = rgb_image.tobytes("raw", "RGB")
         return QImage(data, rgb_image.width, rgb_image.height, rgb_image.width * 3, QImage.Format_RGB888)
 
+    def _atualizar_contas_combo(self):
+        if not hasattr(self, "combo_account") or not hasattr(self, "am"):
+            return
+        self.combo_account.clear()
+        for acc in self.am.get_all_accounts():
+            status = "🟢" if acc.has_cookies() else "🔴"
+            self.combo_account.addItem(f"{status} {acc.name} ({acc.niche})", acc.id)
+
     def _publicar_pin_agora(self):
         if not self.current_product or not self.current_pil_image:
             QMessageBox.warning(self, "Atenção", "Selecione um produto e gere a imagem antes de publicar.")
             return
 
         board_id = self.combo_boards.currentData() or self.cfg.get("pinterest_board_id", "")
-        if not board_id:
+        board_name = self.combo_boards.currentText() or self.cfg.get("pinterest_board_name", "")
+        post_method = self.cfg.get("post_method", "browser")
+        palette_key = self.combo_palette.currentData() or "auto"
+        post_format = self.combo_format.currentData() or "image"
+        account_id = self.combo_account.currentData() or "default"
+
+        if post_method == "api" and not board_id:
             QMessageBox.warning(self, "Atenção", "Selecione uma pasta do Pinterest nas Configurações.")
             return
 
@@ -409,7 +499,11 @@ class DashboardPage(QWidget):
             board_id=board_id,
             template="classic_deal",
             config=self.cfg,
-            database=self.db
+            database=self.db,
+            board_name=board_name,
+            palette_key=palette_key,
+            post_format=post_format,
+            account_id=account_id
         )
         self._worker_publish.sig_log.connect(self.sig_log.emit)
         self._worker_publish.sig_success.connect(self._on_publish_success)
