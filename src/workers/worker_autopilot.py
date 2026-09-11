@@ -150,8 +150,10 @@ class WorkerAutopilot(QThread):
         jitter_secs = int(ideal_interval_secs * 0.20)
         actual_delay_secs = int(ideal_interval_secs + random.randint(-jitter_secs, jitter_secs))
 
-        # Garante no mínimo 30 minutos entre postagens para blindagem contra filtros anti-bot
-        actual_delay_secs = max(1800, actual_delay_secs)
+        # Piso de segurança adaptativo: garante que não ocorram disparos em rajada rápida,
+        # permitindo que metas de até 30 pins/dia sejam distribuídas naturalmente (mínimo de 15 min)
+        min_floor_secs = min(900, max(600, int(ideal_interval_secs * 0.7)))
+        actual_delay_secs = max(min_floor_secs, actual_delay_secs)
 
         delay_min = actual_delay_secs // 60
         next_time = now + timedelta(seconds=actual_delay_secs)
