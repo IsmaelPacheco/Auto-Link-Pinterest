@@ -90,8 +90,9 @@ class MainWindow(QMainWindow):
         self.pagina_accounts.sig_log.connect(self.sidebar.append_log)
         self.pagina_settings.sig_log.connect(self.sidebar.append_log)
 
-        # Atualização em tempo real de contas no Dashboard
+        # Atualização em tempo real de contas no Dashboard e Piloto Automático
         self.pagina_accounts.sig_accounts_changed.connect(self.pagina_dashboard._atualizar_contas_combo)
+        self.pagina_accounts.sig_accounts_changed.connect(self.pagina_autopilot.atualizar_estatisticas)
 
         # Adicionar à pilha
         self.stacked_widget.addWidget(self.pagina_dashboard)  # 0
