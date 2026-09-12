@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -9,7 +9,19 @@
   <meta name="description" content="Encontre os links oficiais com desconto dos achadinhos do TikTok e Pinterest!">
   <meta property="og:title" content="Achadinhos da Shopee • Vitrine Oficial">
   <meta property="og:description" content="Digite o número do vídeo para encontrar a oferta oficial com cupom!">
-  <meta name="theme-color" content="#0B0F19">
+  <meta name="theme-color" id="themeColorMeta" content="#F8FAFC">
+
+  <!-- Script de Inicialização Rápida de Tema (Padrão: Modo Light) -->
+  <script>
+    (function() {
+      const saved = localStorage.getItem('theme') || 'light';
+      if (saved === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
 
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -40,8 +52,6 @@
   <style>
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #0B0F19;
-      color: #F9FAFB;
       -webkit-tap-highlight-color: transparent;
     }
     .custom-scrollbar::-webkit-scrollbar {
@@ -61,42 +71,81 @@
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.02); }
     }
+
+    /* Pílulas de Categoria (Compatibilidade Automática Light / Dark) */
+    .cat-pill-inactive {
+      background-color: #FFFFFF;
+      color: #4B5563;
+      border: 1px solid #E5E7EB;
+    }
+    .cat-pill-inactive:hover {
+      border-color: #CBD5E1;
+      color: #111827;
+    }
+    .dark .cat-pill-inactive {
+      background-color: #111827;
+      color: #D1D5DB;
+      border: 1px solid #1F2937;
+    }
+    .dark .cat-pill-inactive:hover {
+      border-color: #374151;
+      color: #F9FAFB;
+    }
+    .cat-pill-active {
+      background-color: #EE4D2D !important;
+      color: #FFFFFF !important;
+      border: 1px solid #EE4D2D !important;
+      box-shadow: 0 2px 8px rgba(238, 77, 45, 0.25);
+    }
   </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-shopee selection:text-white">
+<body class="min-h-screen flex flex-col antialiased bg-slate-50 dark:bg-darkBg text-slate-900 dark:text-gray-100 transition-colors duration-200 selection:bg-shopee selection:text-white">
 
   <!-- TOPO / HEADER DE IDENTIDADE -->
-  <header class="sticky top-0 z-40 bg-darkBg/90 backdrop-blur-md border-b border-cardBorder">
+  <header class="sticky top-0 z-40 bg-white/95 dark:bg-darkBg/90 backdrop-blur-md border-b border-gray-200 dark:border-cardBorder transition-colors duration-200">
     <div class="max-w-2xl mx-auto px-4 py-3">
       
-      <!-- Linha do Perfil / Marca -->
+      <!-- Linha do Perfil / Marca + Controles (Tema e Filtro de Conta) -->
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-full badge-number flex items-center justify-center text-white text-xl shadow-lg shadow-shopee/20 font-black">
+          <div class="w-11 h-11 rounded-full badge-number flex items-center justify-center text-white text-xl shadow-lg shadow-shopee/20 font-black flex-shrink-0">
             🛍️
           </div>
           <div>
             <div class="flex items-center gap-1.5">
-              <h1 id="brandTitle" class="text-base font-bold text-white tracking-tight">Achadinhos Oficiais</h1>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <h1 id="brandTitle" class="text-base font-bold text-gray-900 dark:text-white tracking-tight">Achadinhos Oficiais</h1>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                 ✓ Verificado
               </span>
             </div>
-            <p class="text-xs text-gray-400">Links oficiais da Shopee com cupons ativos</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Links oficiais da Shopee com cupons ativos</p>
           </div>
         </div>
 
-        <!-- Seletor Rápido de Canal / Conta -->
-        <select id="accountFilter" class="bg-cardBg text-xs text-gray-300 border border-cardBorder rounded-lg px-2.5 py-1.5 outline-none focus:border-shopee transition">
-          <option value="all">Todas as Contas</option>
-          <option value="Achadinhos da Timy">🌸 Timy</option>
-          <option value="CupomZilla">🦖 CupomZilla</option>
-        </select>
+        <div class="flex items-center gap-2">
+          <!-- Alternador de Modo Claro / Escuro (Toggle) -->
+          <button 
+            id="themeToggleBtn" 
+            type="button"
+            class="h-9 px-2.5 flex items-center justify-center gap-1.5 rounded-xl bg-white dark:bg-cardBg border border-gray-200 dark:border-cardBorder text-gray-600 dark:text-gray-300 hover:border-shopee dark:hover:border-shopee transition shadow-sm"
+            title="Alternar Tema Claro / Escuro"
+          >
+            <span id="themeIcon" class="text-sm">🌙</span>
+            <span id="themeText" class="text-[11px] font-semibold hidden sm:inline">Tema</span>
+          </button>
+
+          <!-- Seletor Rápido de Canal / Conta -->
+          <select id="accountFilter" class="bg-white dark:bg-cardBg text-xs text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-cardBorder rounded-xl px-2.5 py-2 outline-none focus:border-shopee transition font-medium shadow-sm">
+            <option value="all">Todas as Contas</option>
+            <option value="Achadinhos da Timy">🌸 Timy</option>
+            <option value="CupomZilla">🦖 CupomZilla</option>
+          </select>
+        </div>
       </div>
 
       <!-- BARRA DE PESQUISA POR NÚMERO OU NOME (DESTAQUE MÁXIMO) -->
       <div class="relative">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
@@ -105,10 +154,10 @@
           type="text" 
           id="searchInput" 
           placeholder="🔍 Digite o número do vídeo (ex: 42) ou nome..."
-          class="w-full pl-11 pr-10 py-3 bg-cardBg border-2 border-cardBorder focus:border-shopee text-white rounded-xl text-sm placeholder-gray-500 outline-none transition shadow-inner font-medium"
+          class="w-full pl-11 pr-10 py-3 bg-white dark:bg-cardBg border-2 border-gray-200 dark:border-cardBorder focus:border-shopee dark:focus:border-shopee text-gray-900 dark:text-white rounded-xl text-sm placeholder-gray-400 dark:placeholder-gray-500 outline-none transition shadow-sm font-medium"
           autocomplete="off"
         >
-        <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-white">
+        <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-white">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
@@ -117,25 +166,25 @@
 
       <!-- CHIPS DE CATEGORIAS (ROLAGEM HORIZONTAL) -->
       <div class="flex items-center gap-2 overflow-x-auto py-2.5 custom-scrollbar text-xs font-semibold whitespace-nowrap mt-1">
-        <button class="cat-pill active px-3 py-1.5 rounded-full bg-shopee text-white border border-shopee transition" data-cat="all">
+        <button class="cat-pill cat-pill-active px-3 py-1.5 rounded-full transition" data-cat="all">
           Todos os Achadinhos
         </button>
-        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Cozinha Prática">
+        <button class="cat-pill cat-pill-inactive px-3 py-1.5 rounded-full transition" data-cat="Cozinha Prática">
           🍳 Cozinha
         </button>
-        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Casa & Organização">
+        <button class="cat-pill cat-pill-inactive px-3 py-1.5 rounded-full transition" data-cat="Casa & Organização">
           🏠 Organização
         </button>
-        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Gadgets & Setup">
+        <button class="cat-pill cat-pill-inactive px-3 py-1.5 rounded-full transition" data-cat="Gadgets & Setup">
           ⚡ Gadgets
         </button>
-        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Decoração & Estilo">
+        <button class="cat-pill cat-pill-inactive px-3 py-1.5 rounded-full transition" data-cat="Decoração & Estilo">
           ✨ Decoração
         </button>
-        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Beleza & Cuidados">
+        <button class="cat-pill cat-pill-inactive px-3 py-1.5 rounded-full transition" data-cat="Beleza & Cuidados">
           💄 Beleza
         </button>
-        <button class="cat-pill px-3 py-1.5 rounded-full bg-cardBg text-gray-300 border border-cardBorder hover:border-gray-500 transition" data-cat="Limpeza Inteligente">
+        <button class="cat-pill cat-pill-inactive px-3 py-1.5 rounded-full transition" data-cat="Limpeza Inteligente">
           🧹 Limpeza
         </button>
       </div>
@@ -145,10 +194,10 @@
 
   <!-- BANNER DE AVISO / AJUDA -->
   <div class="max-w-2xl mx-auto px-4 pt-3 pb-1 w-full">
-    <div class="bg-gradient-to-r from-orange-500/10 via-pink-500/10 to-transparent border border-shopee/20 rounded-xl p-3 flex items-center gap-3">
+    <div class="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-shopee/20 rounded-xl p-3 flex items-center gap-3 transition-colors">
       <span class="text-2xl">💡</span>
-      <p class="text-xs text-gray-300 leading-snug">
-        Viu um achadinho no <b class="text-white">TikTok</b> ou <b class="text-white">Pinterest</b>? Digite o <b class="text-shopee font-bold">número do vídeo</b> na barra acima para ir direto ao link com desconto!
+      <p class="text-xs text-gray-700 dark:text-gray-300 leading-snug">
+        Viu um achadinho no <b class="text-gray-900 dark:text-white">TikTok</b> ou <b class="text-gray-900 dark:text-white">Pinterest</b>? Digite o <b class="text-shopee font-bold">número do vídeo</b> na barra acima para ir direto ao link com desconto!
       </p>
     </div>
   </div>
@@ -157,7 +206,7 @@
   <main class="flex-1 max-w-2xl mx-auto px-4 py-4 w-full">
     
     <!-- Contador de Resultados -->
-    <div class="flex items-center justify-between text-xs text-gray-400 mb-3 px-1">
+    <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3 px-1">
       <span id="resultsCount">Carregando ofertas...</span>
       <span id="activeFilterLabel" class="text-shopee font-semibold"></span>
     </div>
@@ -169,14 +218,14 @@
 
     <!-- Estado Vazio (Nenhum produto encontrado) -->
     <div id="emptyState" class="hidden text-center py-16 px-4">
-      <div class="w-16 h-16 mx-auto rounded-full bg-cardBg border border-cardBorder flex items-center justify-center text-3xl mb-3">
+      <div class="w-16 h-16 mx-auto rounded-full bg-white dark:bg-cardBg border border-gray-200 dark:border-cardBorder flex items-center justify-center text-3xl mb-3 shadow-sm">
         🔍
       </div>
-      <h3 class="text-base font-bold text-white mb-1">Nenhum achadinho encontrado</h3>
-      <p class="text-xs text-gray-400 max-w-xs mx-auto mb-4">
+      <h3 class="text-base font-bold text-gray-900 dark:text-white mb-1">Nenhum achadinho encontrado</h3>
+      <p class="text-xs text-gray-500 dark:text-gray-400 max-w-xs mx-auto mb-4">
         Não encontramos nenhum produto com esse número ou termo. Tente buscar por palavras como <i>"organizador"</i>, <i>"fone"</i> ou <i>"cozinha"</i>.
       </p>
-      <button id="resetSearchBtn" class="px-4 py-2 bg-cardBg border border-cardBorder hover:border-shopee text-xs font-bold text-white rounded-lg transition">
+      <button id="resetSearchBtn" class="px-4 py-2 bg-white dark:bg-cardBg border border-gray-200 dark:border-cardBorder hover:border-shopee text-xs font-bold text-gray-800 dark:text-white rounded-xl transition shadow-sm">
         Ver Todos os Achadinhos
       </button>
     </div>
@@ -184,13 +233,13 @@
   </main>
 
   <!-- RODAPÉ -->
-  <footer class="border-t border-cardBorder bg-darkBg py-6 px-4 text-center text-xs text-gray-500">
+  <footer class="border-t border-gray-200 dark:border-cardBorder bg-white dark:bg-darkBg py-6 px-4 text-center text-xs text-gray-500 transition-colors">
     <div class="max-w-2xl mx-auto space-y-2">
-      <p class="font-medium text-gray-400">Vitrine Oficial de Achadinhos & Cupons</p>
-      <p class="text-[11px] text-gray-600">
+      <p class="font-medium text-gray-700 dark:text-gray-400">Vitrine Oficial de Achadinhos & Cupons</p>
+      <p class="text-[11px] text-gray-500 dark:text-gray-500">
         Participamos do Programa de Afiliados da Shopee. Ao comprar pelos nossos links, você não paga nada a mais e apoia a curadoria diária de ofertas! 💖
       </p>
-      <p class="text-[10px] text-gray-700 pt-2">© 2026 • AutoLink Showcase</p>
+      <p class="text-[10px] text-gray-400 dark:text-gray-600 pt-2">© 2026 • AutoLink Showcase</p>
     </div>
   </footer>
 
@@ -208,8 +257,39 @@
     const resetSearchBtn = document.getElementById('resetSearchBtn');
     const accountFilter = document.getElementById('accountFilter');
     const catPills = document.querySelectorAll('.cat-pill');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeText = document.getElementById('themeText');
+    const themeColorMeta = document.getElementById('themeColorMeta');
 
-    // 1. Carrega dados do arquivo products.json
+    // 1. Gerenciamento do Tema Claro / Escuro (Padrão: Light)
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        themeIcon.textContent = '☀️';
+        if (themeText) themeText.textContent = 'Claro';
+        themeToggleBtn.setAttribute('title', 'Mudar para Modo Claro');
+        if (themeColorMeta) themeColorMeta.content = '#0B0F19';
+      } else {
+        document.documentElement.classList.remove('dark');
+        themeIcon.textContent = '🌙';
+        if (themeText) themeText.textContent = 'Escuro';
+        themeToggleBtn.setAttribute('title', 'Mudar para Modo Escuro');
+        if (themeColorMeta) themeColorMeta.content = '#F8FAFC';
+      }
+      localStorage.setItem('theme', theme);
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      applyTheme(isDark ? 'light' : 'dark');
+    });
+
+    // Inicia ícone e meta tag com base na preferência (padrão 'light')
+    const initialTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(initialTheme);
+
+    // 2. Carrega dados do arquivo products.json
     async function loadProducts() {
       try {
         const res = await fetch('data/products.json?v=' + Date.now());
@@ -225,6 +305,7 @@
             discount_price: 11.95,
             discount_percent: 60,
             affiliate_link: "https://shopee.com.br",
+            image_url: "",
             category: "Cozinha Prática",
             account_name: "Achadinhos da Timy"
           },
@@ -235,6 +316,7 @@
             discount_price: 89.90,
             discount_percent: 53,
             affiliate_link: "https://shopee.com.br",
+            image_url: "",
             category: "Gadgets & Setup",
             account_name: "CupomZilla"
           },
@@ -245,6 +327,7 @@
             discount_price: 19.99,
             discount_percent: 56,
             affiliate_link: "https://shopee.com.br",
+            image_url: "",
             category: "Casa & Organização",
             account_name: "Achadinhos da Timy"
           }
@@ -255,7 +338,7 @@
       render();
     }
 
-    // 2. Renderiza os Cards de Produtos
+    // 3. Renderiza os Cards de Produtos
     function render() {
       const query = searchInput.value.trim().toLowerCase();
       clearSearchBtn.classList.toggle('hidden', query.length === 0);
@@ -307,34 +390,34 @@
         const priceHtml = p.discount_price > 0
           ? `
             <div class="flex items-baseline gap-2">
-              <span class="text-base font-extrabold text-white">R$ ${p.discount_price.toFixed(2).replace('.', ',')}</span>
-              ${p.original_price > p.discount_price ? `<span class="text-xs text-gray-500 line-through">R$ ${p.original_price.toFixed(2).replace('.', ',')}</span>` : ''}
+              <span class="text-base font-extrabold text-gray-900 dark:text-white">R$ ${p.discount_price.toFixed(2).replace('.', ',')}</span>
+              ${p.original_price > p.discount_price ? `<span class="text-xs text-gray-400 dark:text-gray-500 line-through">R$ ${p.original_price.toFixed(2).replace('.', ',')}</span>` : ''}
             </div>
           `
           : `<span class="text-sm font-bold text-shopee">Confira o Preço</span>`;
 
         const imgHtml = p.image_url 
           ? `
-            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-darkBg/80 border border-cardBorder/60 flex items-center justify-center group-hover:border-shopee/40 transition">
+            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-gray-100 dark:bg-darkBg/80 border border-gray-100 dark:border-cardBorder/60 flex items-center justify-center group-hover:border-shopee/40 transition">
               <img 
                 src="${p.image_url}" 
                 alt="${p.title}" 
                 loading="lazy"
                 class="w-full h-full object-cover group-hover:scale-105 transition duration-300 ease-out"
-                onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center bg-cardBg/50 text-gray-500 text-3xl\\'>🛍️</div>';"
+                onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-cardBg/50 text-gray-400 dark:text-gray-500 text-3xl\\'>🛍️</div>';"
               />
               ${discountBadge ? `<div class="absolute top-2 right-2 drop-shadow-md">${discountBadge}</div>` : ''}
             </div>
           `
           : `
-            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-darkBg/60 border border-cardBorder/40 flex items-center justify-center text-3xl text-gray-500">
+            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-gray-100 dark:bg-darkBg/60 border border-gray-100 dark:border-cardBorder/40 flex items-center justify-center text-3xl text-gray-400 dark:text-gray-500">
               🛍️
               ${discountBadge ? `<div class="absolute top-2 right-2 drop-shadow-md">${discountBadge}</div>` : ''}
             </div>
           `;
 
         return `
-          <div id="item-${num}" class="bg-cardBg border border-cardBorder rounded-2xl p-3.5 flex flex-col justify-between hover:border-shopee/60 transition shadow-lg relative overflow-hidden group">
+          <div id="item-${num}" class="bg-white dark:bg-cardBg border border-gray-200 dark:border-cardBorder rounded-2xl p-3.5 flex flex-col justify-between hover:border-shopee/60 dark:hover:border-shopee/60 transition shadow-sm hover:shadow-md relative overflow-hidden group">
             
             <div>
               <!-- TOPO DO CARD: NÚMERO DE DESTAQUE + CATEGORIA -->
@@ -342,7 +425,7 @@
                 <div class="badge-number text-white font-black text-xs px-2.5 py-1 rounded-lg shadow-md flex items-center gap-1 tracking-wide">
                   <span>#${num}</span>
                 </div>
-                <span class="text-[11px] font-medium text-gray-400 truncate max-w-[150px]">
+                <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate max-w-[150px]">
                   ${p.category || 'Achadinho'}
                 </span>
               </div>
@@ -351,14 +434,14 @@
               ${imgHtml}
 
               <!-- TÍTULO DO PRODUTO -->
-              <h2 class="text-sm font-semibold text-gray-100 line-clamp-2 mb-3 leading-snug group-hover:text-shopee transition">
+              <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100 line-clamp-2 mb-3 leading-snug group-hover:text-shopee transition">
                 ${p.title}
               </h2>
             </div>
 
             <div>
               <!-- BLOCO DE PREÇO & DESCONTO -->
-              <div class="flex items-center justify-between gap-2 mb-3 bg-darkBg/60 px-3 py-2 rounded-xl border border-cardBorder">
+              <div class="flex items-center justify-between gap-2 mb-3 bg-slate-50 dark:bg-darkBg/60 px-3 py-2 rounded-xl border border-gray-100 dark:border-cardBorder">
                 ${priceHtml}
               </div>
 
@@ -381,7 +464,7 @@
       }).join('');
     }
 
-    // 3. Suporte a Parâmetros na URL (?p=42 ou #42)
+    // 4. Suporte a Parâmetros na URL (?p=42 ou #42)
     function checkUrlParam() {
       const urlParams = new URLSearchParams(window.location.search);
       const paramP = urlParams.get('p') || urlParams.get('id') || window.location.hash.replace('#', '');
@@ -397,7 +480,7 @@
       }
     }
 
-    // 4. Listeners de Busca e Filtros
+    // 5. Listeners de Busca e Filtros
     searchInput.addEventListener('input', render);
     clearSearchBtn.addEventListener('click', () => {
       searchInput.value = '';
@@ -405,14 +488,20 @@
       searchInput.focus();
     });
 
+    function updatePills(activeCat) {
+      catPills.forEach(p => {
+        const isActive = p.dataset.cat === activeCat;
+        p.classList.toggle('cat-pill-active', isActive);
+        p.classList.toggle('cat-pill-inactive', !isActive);
+      });
+    }
+
     resetSearchBtn.addEventListener('click', () => {
       searchInput.value = '';
       currentCategory = 'all';
       currentAccount = 'all';
       accountFilter.value = 'all';
-      catPills.forEach(p => p.classList.toggle('active', p.dataset.cat === 'all'));
-      catPills.forEach(p => p.classList.toggle('bg-shopee', p.dataset.cat === 'all'));
-      catPills.forEach(p => p.classList.toggle('text-white', p.dataset.cat === 'all'));
+      updatePills('all');
       render();
     });
 
@@ -423,13 +512,8 @@
 
     catPills.forEach(pill => {
       pill.addEventListener('click', () => {
-        catPills.forEach(p => {
-          p.classList.remove('bg-shopee', 'text-white', 'border-shopee', 'active');
-          p.classList.add('bg-cardBg', 'text-gray-300', 'border-cardBorder');
-        });
-        pill.classList.remove('bg-cardBg', 'text-gray-300', 'border-cardBorder');
-        pill.classList.add('bg-shopee', 'text-white', 'border-shopee', 'active');
         currentCategory = pill.dataset.cat;
+        updatePills(currentCategory);
         render();
       });
     });
@@ -439,4 +523,3 @@
   </script>
 </body>
 </html>
-
