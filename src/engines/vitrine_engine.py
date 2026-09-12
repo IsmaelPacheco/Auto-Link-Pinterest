@@ -6,8 +6,10 @@ estáticos (HTML/CSS/JS) para hospedagem 100% gratuita no GitHub Pages ou Cloudf
 """
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from PIL import Image
 
 from src.models.database import Database
 from src.models.account_manager import AccountManager
@@ -17,7 +19,10 @@ logger = logging.getLogger("AutoLink.VitrineEngine")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 VITRINE_DIR = PROJECT_ROOT / "vitrine"
 DATA_DIR = VITRINE_DIR / "data"
+VITRINE_IMAGES_DIR = VITRINE_DIR / "images"
 DOCS_DIR = PROJECT_ROOT / "docs"  # Para deploy automático no GitHub Pages
+DOCS_DATA_DIR = DOCS_DIR / "data"
+DOCS_IMAGES_DIR = DOCS_DIR / "images"
 
 
 class VitrineEngine:
@@ -27,6 +32,10 @@ class VitrineEngine:
         self.db = database or Database()
         self.am = AccountManager()
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+        VITRINE_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        DOCS_DIR.mkdir(parents=True, exist_ok=True)
+        DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        DOCS_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
     def _infer_category(self, title: str, account_niche: str = "") -> str:
         """Categoriza o produto com base no nicho da conta e palavras do título."""
@@ -49,6 +58,57 @@ class VitrineEngine:
 
         return "Achadinhos Gerais"
 
+    def _extract_or_copy_thumbnail(self, image_path: str, item_num: int) -> str:
+        """
+        Gera thumbnail otimizado a partir de imagem local ou extrai frame de vídeo MP4.
+        Retorna o caminho relativo 'images/thumb_{item_num}.jpg' ou vazio se falhar.
+        """
+        if not image_path:
+            return ""
+
+        img_p = Path(image_path)
+        if not img_p.exists():
+            return ""
+
+        thumb_name = f"thumb_{item_num}.jpg"
+        target_vitrine = VITRINE_IMAGES_DIR / thumb_name
+        target_docs = DOCS_IMAGES_DIR / thumb_name
+
+        # Se já existe em ambos os diretórios, reutiliza diretamente
+        if target_vitrine.exists() and target_docs.exists():
+            return f"images/{thumb_name}"
+
+        try:
+            im = None
+            suffix = img_p.suffix.lower()
+
+            if suffix == ".mp4":
+                try:
+                    import imageio.v3 as iio
+                    frame = iio.imread(str(img_p), index=0)
+                    im = Image.fromarray(frame)
+                except Exception as ex_vid:
+                    logger.warning(f"Erro ao extrair frame de vídeo {img_p}: {ex_vid}")
+            else:
+                try:
+                    im = Image.open(str(img_p))
+                except Exception as ex_img:
+                    logger.warning(f"Erro ao abrir imagem {img_p}: {ex_img}")
+
+            if im:
+                im = im.convert("RGB")
+                # Redimensiona mantendo proporção para no máximo 600x600 (alta nitidez e leve)
+                im.thumbnail((600, 600), Image.Resampling.LANCZOS)
+                
+                im.save(target_vitrine, "JPEG", quality=82, optimize=True)
+                im.save(target_docs, "JPEG", quality=82, optimize=True)
+                return f"images/{thumb_name}"
+
+        except Exception as e:
+            logger.error(f"Falha ao gerar thumbnail para #{item_num} ({img_p}): {e}")
+
+        return ""
+
     def compile_products(self) -> List[Dict[str, Any]]:
         """Lê os produtos do banco e compila a estrutura completa para a vitrine."""
         raw_products = self.db.get_all_vitrine_products()
@@ -70,12 +130,15 @@ class VitrineEngine:
             acc_niche = acc_obj.niche if acc_obj else "Achadinhos"
 
             img_path = p.get("image_path") or ""
-            # Se for caminho local no Windows, pega apenas o nome do arquivo para web ou mantém
-            img_rel = ""
-            if img_path:
-                img_p = Path(img_path)
-                if img_p.exists():
-                    img_rel = f"../{img_p.as_posix()}" if not img_p.is_absolute() else img_p.name
+
+            # Prioridade da Imagem:
+            # 1. URL pública direta (Shopee CDN)
+            # 2. Thumbnail local gerado do arquivo de imagem ou vídeo MP4
+            img_url = p.get("image_url") or ""
+            if not img_url or not str(img_url).startswith("http"):
+                thumb_rel = self._extract_or_copy_thumbnail(img_path, int(item_num))
+                if thumb_rel:
+                    img_url = thumb_rel
 
             category = self._infer_category(p.get("title", ""), acc_niche)
 
@@ -86,6 +149,7 @@ class VitrineEngine:
                 "discount_price": disc,
                 "discount_percent": discount_pct,
                 "affiliate_link": p.get("affiliate_link", ""),
+                "image_url": img_url,
                 "image_path": img_path,
                 "category": category,
                 "account_id": acc_id,
@@ -110,12 +174,8 @@ class VitrineEngine:
             with open(target_json, "w", encoding="utf-8") as f:
                 json.dump(products, f, ensure_ascii=False, indent=2)
 
-            # 2. Se a pasta docs/ existir ou para deploy no GitHub Pages, espelha
-            DOCS_DIR.mkdir(parents=True, exist_ok=True)
-            docs_data = DOCS_DIR / "data"
-            docs_data.mkdir(parents=True, exist_ok=True)
-
-            with open(docs_data / "products.json", "w", encoding="utf-8") as f:
+            # 2. Espelha para docs/ (GitHub Pages)
+            with open(DOCS_DATA_DIR / "products.json", "w", encoding="utf-8") as f:
                 json.dump(products, f, ensure_ascii=False, indent=2)
 
             # Copia index.html para docs/index.html se existir
@@ -125,6 +185,13 @@ class VitrineEngine:
                     content = f_in.read()
                 with open(DOCS_DIR / "index.html", "w", encoding="utf-8") as f_out:
                     f_out.write(content)
+
+            # Garante sincronia dos thumbnails em docs/images
+            if VITRINE_IMAGES_DIR.exists():
+                for f in VITRINE_IMAGES_DIR.glob("*.jpg"):
+                    doc_thumb = DOCS_IMAGES_DIR / f.name
+                    if not doc_thumb.exists():
+                        shutil.copy2(f, doc_thumb)
 
             logger.info(f"Vitrine sincronizada com sucesso! Total: {len(products)} achadinhos.")
             return {

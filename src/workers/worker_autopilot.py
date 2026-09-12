@@ -405,7 +405,8 @@ class WorkerAutopilot(QThread):
                     pinterest_url=pin_url,
                     status="SUCCESS",
                     account_id=cur_account.id,
-                    item_number=item_num
+                    item_number=item_num,
+                    image_url=selected_product.get("image_url", "")
                 )
 
                 # 11. Sincroniza automaticamente a Vitrine Própria de Achadinhos

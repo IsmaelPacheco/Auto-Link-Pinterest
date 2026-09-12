@@ -41,6 +41,7 @@ class Database:
                     discount_price REAL,
                     affiliate_link TEXT,
                     image_path TEXT,
+                    image_url TEXT,
                     pinterest_pin_id TEXT,
                     pinterest_board_id TEXT,
                     pinterest_url TEXT,
@@ -57,6 +58,11 @@ class Database:
 
             try:
                 cursor.execute("ALTER TABLE posted_pins ADD COLUMN item_number INTEGER")
+            except Exception:
+                pass
+
+            try:
+                cursor.execute("ALTER TABLE posted_pins ADD COLUMN image_url TEXT")
             except Exception:
                 pass
 
@@ -107,9 +113,10 @@ class Database:
         status: str = "SUCCESS",
         error_message: Optional[str] = None,
         account_id: str = "default",
-        item_number: Optional[int] = None
+        item_number: Optional[int] = None,
+        image_url: Optional[str] = None
     ) -> int:
-        """Registra uma publicação no banco de dados vinculada a uma conta com numeração sequencial."""
+        """Registra uma publicação no banco de dados vinculada a uma conta com numeração sequencial e URL de imagem."""
         if item_number is None:
             item_number = self.get_next_item_number()
 
@@ -118,9 +125,9 @@ class Database:
             cursor.execute("""
                 INSERT OR REPLACE INTO posted_pins (
                     account_id, item_number, shopee_item_id, title, original_price, discount_price,
-                    affiliate_link, image_path, pinterest_pin_id,
+                    affiliate_link, image_path, image_url, pinterest_pin_id,
                     pinterest_board_id, pinterest_url, status, error_message, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 str(account_id or "default"),
                 int(item_number),
@@ -130,6 +137,7 @@ class Database:
                 discount_price,
                 affiliate_link,
                 image_path,
+                image_url,
                 pinterest_pin_id,
                 pinterest_board_id,
                 pinterest_url,
@@ -163,7 +171,7 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, account_id, item_number, shopee_item_id, title, 
-                       original_price, discount_price, affiliate_link, image_path, 
+                       original_price, discount_price, affiliate_link, image_path, image_url,
                        pinterest_url, created_at
                 FROM posted_pins
                 WHERE status = 'SUCCESS' AND affiliate_link IS NOT NULL

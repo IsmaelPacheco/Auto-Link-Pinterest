@@ -206,7 +206,8 @@ class WorkerPublishPin(QThread):
                 pinterest_url=pin_url,
                 status="SUCCESS",
                 account_id=self.account_id,
-                item_number=item_num
+                item_number=item_num,
+                image_url=self.product.get("image_url", "")
             )
 
             # 5. Sincroniza a Vitrine Web

@@ -301,7 +301,7 @@
       productsGrid.innerHTML = filtered.map(p => {
         const num = p.item_number || 1;
         const discountBadge = p.discount_percent > 0 
-          ? `<span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded">-${p.discount_percent}% OFF</span>` 
+          ? `<span class="bg-red-500/90 text-white shadow text-[10px] font-bold px-2 py-0.5 rounded-md">-${p.discount_percent}% OFF</span>` 
           : '';
 
         const priceHtml = p.discount_price > 0
@@ -313,42 +313,68 @@
           `
           : `<span class="text-sm font-bold text-shopee">Confira o Preço</span>`;
 
+        const imgHtml = p.image_url 
+          ? `
+            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-darkBg/80 border border-cardBorder/60 flex items-center justify-center group-hover:border-shopee/40 transition">
+              <img 
+                src="${p.image_url}" 
+                alt="${p.title}" 
+                loading="lazy"
+                class="w-full h-full object-cover group-hover:scale-105 transition duration-300 ease-out"
+                onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center bg-cardBg/50 text-gray-500 text-3xl\\'>🛍️</div>';"
+              />
+              ${discountBadge ? `<div class="absolute top-2 right-2 drop-shadow-md">${discountBadge}</div>` : ''}
+            </div>
+          `
+          : `
+            <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 bg-darkBg/60 border border-cardBorder/40 flex items-center justify-center text-3xl text-gray-500">
+              🛍️
+              ${discountBadge ? `<div class="absolute top-2 right-2 drop-shadow-md">${discountBadge}</div>` : ''}
+            </div>
+          `;
+
         return `
           <div id="item-${num}" class="bg-cardBg border border-cardBorder rounded-2xl p-3.5 flex flex-col justify-between hover:border-shopee/60 transition shadow-lg relative overflow-hidden group">
             
-            <!-- TOPO DO CARD: NÚMERO DE DESTAQUE + CATEGORIA -->
-            <div class="flex items-center justify-between gap-2 mb-2.5">
-              <div class="badge-number text-white font-black text-xs px-2.5 py-1 rounded-lg shadow-md flex items-center gap-1 tracking-wide">
-                <span>#${num}</span>
+            <div>
+              <!-- TOPO DO CARD: NÚMERO DE DESTAQUE + CATEGORIA -->
+              <div class="flex items-center justify-between gap-2 mb-2.5">
+                <div class="badge-number text-white font-black text-xs px-2.5 py-1 rounded-lg shadow-md flex items-center gap-1 tracking-wide">
+                  <span>#${num}</span>
+                </div>
+                <span class="text-[11px] font-medium text-gray-400 truncate max-w-[150px]">
+                  ${p.category || 'Achadinho'}
+                </span>
               </div>
-              <span class="text-[11px] font-medium text-gray-400 truncate max-w-[150px]">
-                ${p.category || 'Achadinho'}
-              </span>
+
+              <!-- IMAGEM DO PRODUTO -->
+              ${imgHtml}
+
+              <!-- TÍTULO DO PRODUTO -->
+              <h2 class="text-sm font-semibold text-gray-100 line-clamp-2 mb-3 leading-snug group-hover:text-shopee transition">
+                ${p.title}
+              </h2>
             </div>
 
-            <!-- TÍTULO DO PRODUTO -->
-            <h2 class="text-sm font-semibold text-gray-100 line-clamp-2 mb-3 leading-snug group-hover:text-shopee transition">
-              ${p.title}
-            </h2>
+            <div>
+              <!-- BLOCO DE PREÇO & DESCONTO -->
+              <div class="flex items-center justify-between gap-2 mb-3 bg-darkBg/60 px-3 py-2 rounded-xl border border-cardBorder">
+                ${priceHtml}
+              </div>
 
-            <!-- BLOCO DE PREÇO & DESCONTO -->
-            <div class="flex items-center justify-between gap-2 mb-3 bg-darkBg/60 px-3 py-2 rounded-xl border border-cardBorder">
-              ${priceHtml}
-              ${discountBadge}
+              <!-- BOTÃO DE AÇÃO: VER NA SHOPEE -->
+              <a 
+                href="${p.affiliate_link || '#'}" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                class="w-full py-2.5 px-4 bg-gradient-to-r from-shopee to-orange-600 hover:from-shopeeHover hover:to-orange-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md shadow-shopee/20 transition active:scale-[0.98]"
+              >
+                <span>Ver Oferta na Shopee</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                </svg>
+              </a>
             </div>
-
-            <!-- BOTÃO DE AÇÃO: VER NA SHOPEE -->
-            <a 
-              href="${p.affiliate_link || '#'}" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              class="w-full py-2.5 px-4 bg-gradient-to-r from-shopee to-orange-600 hover:from-shopeeHover hover:to-orange-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md shadow-shopee/20 transition active:scale-[0.98]"
-            >
-              <span>Ver Oferta na Shopee</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-              </svg>
-            </a>
 
           </div>
         `;
@@ -413,3 +439,4 @@
   </script>
 </body>
 </html>
+

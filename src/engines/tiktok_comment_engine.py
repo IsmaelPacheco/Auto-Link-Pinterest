@@ -175,3 +175,4 @@ class TikTokCommentEngine:
                 "Pronto! O ManyChat responderá todas as pessoas no segundo em que comentarem, mesmo com o computador desligado!"
             )
         }
+

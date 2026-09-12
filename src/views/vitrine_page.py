@@ -328,3 +328,4 @@ class VitrinePage(QWidget):
         d_layout.addWidget(btn_ok, alignment=Qt.AlignRight)
 
         dlg.exec()
+
