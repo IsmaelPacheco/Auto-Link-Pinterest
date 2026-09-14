@@ -242,6 +242,52 @@ class PinterestBrowserEngine:
             logger.warning(f"Erro ao verificar sessão do Pinterest: {e}")
             return False
 
+    def _clean_drafts_if_needed(self, page) -> None:
+        """
+        Verifica se há rascunhos acumulados na página de criação de Pins ou se atingiu o
+        limite de 50 rascunhos do Pinterest, limpando-os automaticamente para liberar a fila.
+        """
+        try:
+            page_text = ""
+            try:
+                page_text = page.inner_text("body")
+            except Exception:
+                pass
+
+            has_limit_alert = "50 rascunhos" in page_text or "limite de rascunhos" in page_text.lower()
+            select_all = (
+                page.query_selector('text="Marcar tudo"')
+                or page.query_selector('label:has-text("Marcar tudo")')
+                or page.query_selector('input[aria-label*="Marcar tudo" i]')
+            )
+
+            if has_limit_alert or select_all:
+                logger.info("Detectados rascunhos acumulados no criador de Pins. Limpando automaticamente...")
+                if select_all:
+                    safe_click(page, select_all)
+                    time.sleep(1.5)
+
+                    trash_btn = page.query_selector(
+                        'button[aria-label*="Excluir" i], button[aria-label*="Delete" i], [data-test-id*="delete" i], [data-test-id*="trash" i]'
+                    )
+                    if trash_btn:
+                        safe_click(page, trash_btn)
+                        time.sleep(1.5)
+
+                        confirm_btn = page.query_selector('button:has-text("Excluir"), button:has-text("Delete")')
+                        if confirm_btn:
+                            safe_click(page, confirm_btn)
+                            time.sleep(3)
+                            logger.info("Rascunhos antigos removidos com sucesso!")
+
+                # Fecha a barra lateral de rascunhos se estiver aberta
+                close_sidebar = page.query_selector('[data-test-id="collapse-drafts-sidebar-button"]')
+                if close_sidebar:
+                    safe_click(page, close_sidebar)
+                    time.sleep(1)
+        except Exception as e:
+            logger.debug(f"Aviso na verificação/limpeza de rascunhos: {e}")
+
     def publish_pin(
         self,
         image_path: str,
@@ -316,10 +362,17 @@ class PinterestBrowserEngine:
                         "message": "Sessão expirada ou não conectada. Use o botão ' Conectar Sessão' nas Configurações para colar seus cookies."
                     }
 
+                # Limpa rascunhos acumulados que possam travar a página (limite de 50)
+                self._clean_drafts_if_needed(page)
+
                 # 1. UPLOAD DA MÍDIA (IMAGEM OU VÍDEO .MP4)
                 is_video = img_file.suffix.lower() in (".mp4", ".mov", ".m4v", ".webm")
                 logger.info(f"Enviando {'vídeo animado (.mp4)' if is_video else 'imagem vertical'}...")
-                file_input = page.wait_for_selector('input[type="file"]', timeout=20000)
+                file_input = page.wait_for_selector('input[type="file"]', timeout=15000)
+                if not file_input:
+                    self._clean_drafts_if_needed(page)
+                    file_input = page.wait_for_selector('input[type="file"]', timeout=10000)
+
                 if file_input:
                     file_input.set_input_files(str(img_file.resolve()))
                     time.sleep(6 if is_video else 3)
@@ -344,6 +397,8 @@ class PinterestBrowserEngine:
                     if elem:
                         title_elem = elem
                         safe_fill(page, elem, title)
+                        page.keyboard.press("Tab")
+                        time.sleep(0.3)
                         break
 
                 # 3. PREENCHIMENTO DA DESCRIÇÃO (REACT / DRAFT.JS RICH TEXT)
@@ -377,6 +432,7 @@ class PinterestBrowserEngine:
                             page.keyboard.press("Backspace")
                             time.sleep(0.2)
                             page.keyboard.insert_text(description)
+                            page.keyboard.press("Tab")
                             time.sleep(0.5)
                             desc_filled = True
                             logger.info(f"Descrição preenchida com sucesso via seletor: {sel}")
@@ -392,6 +448,7 @@ class PinterestBrowserEngine:
                         page.keyboard.press("Tab")
                         time.sleep(0.5)
                         page.keyboard.insert_text(description)
+                        page.keyboard.press("Tab")
                         time.sleep(0.5)
                         logger.info("Descrição inserida via Tab com sucesso!")
                     except Exception as e:
@@ -410,46 +467,84 @@ class PinterestBrowserEngine:
                     elem = page.query_selector(sel)
                     if elem:
                         safe_fill(page, elem, link)
+                        page.keyboard.press("Tab")
+                        time.sleep(0.3)
                         break
 
-                time.sleep(2)
+                time.sleep(1.5)
 
-                # 5. SELEÇÃO DA PASTA (BOARD)
-                if board_name:
-                    logger.info(f"Selecionando pasta: {board_name}")
-                    board_btn_selectors = [
-                        '[data-test-id="board-dropdown-select-button"]',
-                        'button[aria-label*="pasta" i]',
-                        'button[aria-label*="board" i]',
-                        'div[data-test-id="board-dropdown"] button'
-                    ]
-                    for sel in board_btn_selectors:
-                        btn = page.query_selector(sel)
-                        if btn:
-                            safe_click(page, btn)
-                            time.sleep(2)
-                            search_board_input = page.query_selector('input[placeholder*="Pesquisar" i], input[placeholder*="Search" i]')
-                            if search_board_input:
-                                safe_fill(page, search_board_input, board_name)
-                                time.sleep(1)
-                            board_item = page.query_selector(f'text="{board_name}"') or page.query_selector(f'[title*="{board_name}" i]')
-                            if board_item:
-                                human_move_and_click(page, board_item)
-                                human_delay(0.8, 1.5)
-                            break
+                # 5. SELEÇÃO DA PASTA (BOARD) COM CONFIRMAÇÃO ATIVA
+                logger.info(f"Configurando pasta de destino (alvo: '{board_name or 'padrão da conta'}')...")
+                board_btn_selectors = [
+                    '[data-test-id="board-dropdown-select-button"]',
+                    'button[aria-label*="pasta" i]',
+                    'button[aria-label*="board" i]',
+                    'div[data-test-id="board-dropdown"] button',
+                    'div:has-text("Pasta") button'
+                ]
+                board_btn = None
+                for sel in board_btn_selectors:
+                    elem = page.query_selector(sel)
+                    if elem and elem.is_visible():
+                        board_btn = elem
+                        break
+
+                if board_btn:
+                    safe_click(page, board_btn)
+                    time.sleep(1.5)
+
+                    board_selected = False
+                    if board_name:
+                        search_board_input = page.query_selector('input[placeholder*="Pesquisar" i], input[placeholder*="Search" i]')
+                        if search_board_input:
+                            safe_fill(page, search_board_input, board_name)
+                            time.sleep(1)
+                        board_item = page.query_selector(f'text="{board_name}"') or page.query_selector(f'[title*="{board_name}" i]')
+                        if board_item and board_item.is_visible():
+                            human_move_and_click(page, board_item)
+                            human_delay(0.8, 1.5)
+                            board_selected = True
+                            logger.info(f"Pasta '{board_name}' selecionada com sucesso!")
+
+                    # Fallback inteligente: se a pasta solicitada não existe nesta conta, escolhe a primeira pasta válida
+                    if not board_selected:
+                        search_board_input = page.query_selector('input[placeholder*="Pesquisar" i], input[placeholder*="Search" i]')
+                        if search_board_input:
+                            try:
+                                search_board_input.fill("")
+                            except Exception:
+                                pass
+                            time.sleep(0.8)
+
+                        first_board = page.query_selector('[role="option"], [data-test-id="board-row"], div[role="button"][title]')
+                        if first_board and first_board.is_visible():
+                            human_move_and_click(page, first_board)
+                            human_delay(0.8, 1.5)
+                            logger.info("Pasta selecionada via fallback ativo da conta.")
+                        else:
+                            # Fecha o dropdown mantendo a seleção ativa
+                            page.keyboard.press("Escape")
+                            time.sleep(0.5)
+
+                # Desfoca campos clicando em área neutra superior
+                try:
+                    page.mouse.click(10, 10)
+                except Exception:
+                    pass
+                time.sleep(1)
 
                 # 6. CLIQUE NO BOTÃO PUBLICAR
                 logger.info("Aguardando liberação do botão Publicar...")
                 publish_btn_selectors = [
-                    '[data-test-id="board-dropdown-save-button"]',
                     'button:has-text("Publicar")',
+                    '[data-test-id="board-dropdown-save-button"]',
                     'button:has-text("Salvar")',
                     'button:has-text("Publish")',
                     'button:has-text("Save")'
                 ]
 
-                # Se for vídeo, aguarda o processamento do Pinterest concluir (até 25s)
-                max_video_wait = 25 if is_video else 5
+                # Se for vídeo, aguarda a transcodificação do Pinterest concluir (até 35s)
+                max_video_wait = 35 if is_video else 8
                 for _ in range(max_video_wait):
                     ready = False
                     for sel in publish_btn_selectors:

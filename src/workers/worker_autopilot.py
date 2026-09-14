@@ -296,13 +296,19 @@ class WorkerAutopilot(QThread):
                     continue
 
                 # 5. Seleciona a pasta de destino (Gerenciamento da Conta)
-                current_mode = self.cfg.get("board_mode", "rotate")
+                acc_board_list = []
+                if cur_account.board_name:
+                    acc_board_list = [{"id": "", "name": b.strip()} for b in cur_account.board_name.split(",") if b.strip()]
+
+                boards_to_use = acc_board_list if acc_board_list else all_boards
+
+                current_mode = self.cfg.get("board_mode", "smart")
                 board_id, board_name, motivo = self._select_board(
-                    selected_product, all_boards, current_mode, rotation_index
+                    selected_product, boards_to_use, current_mode, rotation_index
                 )
                 rotation_index += 1
-                target_board = cur_account.board_name or board_name
-                self.sig_log.emit(f"📁 Pasta de destino na conta '{cur_account.name}': '{target_board}'", "info")
+                target_board = board_name
+                self.sig_log.emit(f"📁 Pasta de destino na conta '{cur_account.name}': '{target_board}' ({motivo})", "info")
 
                 # 5. Processa o produto escolhido
                 p_title = selected_product.get("title", "Produto Shopee")
